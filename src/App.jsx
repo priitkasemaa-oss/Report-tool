@@ -1,157 +1,126 @@
 import React, { useState, useMemo, useEffect, useRef } from 'react';
-// We use a direct CDN approach for icons to bypass environment installation issues
-import * as LucideIcons from 'lucide-react';
 
-const { 
-  UploadCloud, BarChart3, Download, Globe, ChevronRight, XCircle, 
-  MessageSquare, Save, Sparkles, Map, TrendingUp, FileText, 
-  Printer, ChevronDown, Loader2, FileSearch, CheckCircle2, 
-  AlertTriangle, ArrowUpRight, ArrowDownRight 
-} = LucideIcons;
+// --- BUILT-IN ICONS (Zero installation required) ---
+const Icon = ({ d, size = 20, className = "" }) => (
+  <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}>
+    <path d={d} />
+  </svg>
+);
+
+const Icons = {
+  Upload: (p) => <Icon d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M17 8l-5-5-5 5M12 3v12" {...p} />,
+  Chart: (p) => <Icon d="M12 20V10M18 20V4M6 20v-4" {...p} />,
+  Download: (p) => <Icon d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M7 10l5 5 5-5M12 15V3" {...p} />,
+  Globe: (p) => <Icon d="M12 2a10 10 0 1 0 10 10A10 10 0 0 0 12 2zm0 0c-1.5 2-2.5 5-2.5 10s1 8 2.5 10M12 2c1.5 2 2.5 5 2.5 10s-1 8-2.5 10M2 12h20" {...p} />,
+  ChevronRight: (p) => <Icon d="m9 18 6-6-6-6" {...p} />,
+  X: (p) => <Icon d="M18 6 6 18M6 6l12 12" {...p} />,
+  Message: (p) => <Icon d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" {...p} />,
+  Sparkles: (p) => <Icon d="m12 3 1.912 5.813a2 2 0 0 0 1.275 1.275L21 12l-5.813 1.912a2 2 0 0 0-1.275 1.275L12 21l-1.912-5.813a2 2 0 0 0-1.275-1.275L3 12l5.813-1.912a2 2 0 0 0 1.275-1.275L12 3Z" {...p} />,
+  Map: (p) => <Icon d="M3 6l6-3 6 3 6-3v15l-6 3-6-3-6 3V6zm6-3v15m6-15v15" {...p} />,
+  Up: (p) => <Icon d="M7 17L17 7M7 7h10v10" {...p} />,
+  Down: (p) => <Icon d="M7 7l10 10M17 7v10H7" {...p} />
+};
 
 // --- UTILS & PARSING ---
-
 const getMappedKey = (rawHeader) => {
   if (!rawHeader) return '';
   const h = rawHeader.toLowerCase().replace(/[^a-z0-9]/g, '');
   if (h.includes('month') || h.includes('date')) return 'date';
   if (h.includes('country')) return 'country';
-  if (h.includes('marketingregion')) return 'region';
-  if (h.includes('region') && !h.includes('country')) return 'region';
-  if (h.includes('vendor') || h.includes('platform') || h.includes('source')) return 'platform';
-  if (h.includes('registrations') || h.includes('regs')) return 'regs';
-  if (h.includes('mncs') || h.includes('deposits') || h.includes('conversions') || h.includes('convs')) return 'mncs';
+  if (h.includes('region')) return 'region';
+  if (h.includes('platform') || h.includes('source') || h.includes('vendor')) return 'platform';
+  if (h.includes('mncs') || h.includes('deposits') || h.includes('conv')) return 'mncs';
   if (h.includes('ltv')) return 'ltv';
   if (h.includes('payback')) return 'payback';
   if (h.includes('spend') || h.includes('cost')) return 'spend';
-  return rawHeader;
+  return h;
+};
+
+const safeParseNum = (val) => {
+  if (typeof val === 'number') return val;
+  const cleaned = String(val || '0').replace(/[^\d.-]/g, '');
+  const num = parseFloat(cleaned);
+  return isNaN(num) ? 0 : num;
 };
 
 function parseCSV(text) {
   text = text.replace(/^\uFEFF/, '');
-  const lines = text.split(/\r?\n/);
+  const lines = text.split(/\r?\n/).filter(l => l.trim());
   if (lines.length < 2) return [];
-  const firstLine = lines[0];
-  const delimiter = firstLine.split(';').length > firstLine.split(',').length ? ';' : ',';
-  let p = '', row = [''], ret = [row], i = 0, r = 0, s = !0, l;
-  for (l of text) {
-    if ('"' === l) {
-      if (s && l === p) row[i] += l;
-      s = !s;
-    } else if (delimiter === l && s) l = row[++i] = '';
-    else if ('\n' === l && s) {
-      if ('\r' === p) row[i] = row[i].slice(0, -1);
-      row = ret[++r] = [l = '']; i = 0;
-    } else row[i] += l;
-    p = l;
-  }
-  if (ret[ret.length - 1].length === 1 && ret[ret.length - 1][0] === '') ret.pop();
-  const headers = ret[0].map(h => getMappedKey(h));
-  return ret.slice(1).map(line => {
+  const delimiter = lines[0].includes(';') ? ';' : ',';
+  const headers = lines[0].split(delimiter).map(h => getMappedKey(h.trim().replace(/^"|"$/g, '')));
+  
+  return lines.slice(1).map(line => {
+    const values = line.split(delimiter).map(v => v.trim().replace(/^"|"$/g, ''));
     const obj = {};
-    headers.forEach((mappedKey, index) => {
-      let val = line[index] ? line[index].trim() : '';
-      if (mappedKey === 'platform' && val) {
-        const pStr = val.toLowerCase();
-        if (pStr.includes('google')) val = 'Google AC';
-        else if (pStr.includes('trade') || pStr.includes('ttd')) val = 'TTD';
-        else if (pStr.includes('moloco')) val = 'Moloco';
+    headers.forEach((h, i) => {
+      let val = values[i];
+      if (h === 'platform' && val) {
+        const p = val.toLowerCase();
+        if (p.includes('google')) val = 'Google AC';
+        else if (p.includes('trade')) val = 'TTD';
+        else if (p.includes('moloco')) val = 'Moloco';
       }
-      if (mappedKey === 'date' && val) {
-        const match = val.match(/^(\d{4})[-/](\d{2})/);
-        if (match) val = `${match[1]}-${match[2]}`;
-        else {
-          const d = new Date(val);
-          if (!isNaN(d.getTime())) val = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
-        }
+      if (h === 'date' && val) {
+        const m = val.match(/^(\d{4})[-/](\d{2})/);
+        if (m) val = `${m[1]}-${m[2]}`;
       }
-      if (mappedKey) obj[mappedKey] = val;
+      obj[h] = val;
     });
     return obj;
   });
 }
 
 const REGIONS = ['GLOBAL', 'NORTHAM', 'LATAM', 'ASIA', 'PACIFIC', 'GBR', 'EUROPE', 'ROW', 'MEA'];
-const PLATFORMS_MAP = {
-  'Google App Campaigns': 'Google AC',
-  'The Trade Desk': 'TTD',
-  'Moloco': 'Moloco'
-};
 
 // --- COMPONENTS ---
-
-const AutoExpandingTextarea = ({ value, onChange, placeholder, className }) => {
-  const textareaRef = useRef(null);
-  useEffect(() => {
-    if (textareaRef.current) {
-      textareaRef.current.style.height = 'auto';
-      textareaRef.current.style.height = (textareaRef.current.scrollHeight) + 'px';
-    }
-  }, [value]);
-
-  return (
-    <textarea
-      ref={textareaRef}
-      value={value}
-      onChange={onChange}
-      placeholder={placeholder}
-      className={`w-full overflow-hidden transition-all resize-none block border-0 focus:ring-0 ${className}`}
-      style={{ minHeight: '120px' }}
-    />
-  );
-};
-
 const PlatformDashboard = ({ 
-  title, dashboard, formatCurrency, formatCPA, formatNumber, formatDecimal,
-  commentary, roadmap, onCommentChange, onRoadmapChange, onAutoGenerate, isGlobal
+  title, dashboard, formatCurrency, formatCPA, formatNumber, isGlobal,
+  onNarrativeSync, commentary
 }) => {
   if (!dashboard || dashboard.trend.length === 0) return null;
   const { trend, contributionList } = dashboard;
   
-  const svgWidth = 1000, svgHeight = 550; 
-  const pOuterL = 60, pInnerL = 80, pInnerR = 80, pOuterR = 60; 
-  const chartLeft = pOuterL + pInnerL, chartRight = svgWidth - (pInnerR + pOuterR);
-  const chartWidth = chartRight - chartLeft, paddingY = 70, chartHeight = svgHeight - paddingY * 2; 
+  const svgWidth = 1000, svgHeight = 500; 
+  const pL = 80, pR = 80, pY = 60, cW = svgWidth - pL - pR, cH = svgHeight - pY * 2;
   
-  const maxSpend = Math.max(...trend.map(d => d.spend), 1) * 1.15; 
-  const maxMnc = Math.max(...trend.map(d => d.mncs), 1) * 1.15;
-  const maxLtv = Math.max(...trend.map(d => d.ltv), 1) * 1.15;
-  const maxPayback = Math.max(...trend.map(d => d.payback), 1, 20) * 1.15; 
-  
-  const step = trend.length > 1 ? chartWidth / (trend.length - 1) : 0;
-  const barWidth = Math.min(38, (chartWidth / Math.max(trend.length, 1)) * 0.45);
-  const getY = (val, max) => paddingY + chartHeight - ((val / max) * chartHeight);
-  const getX = (i) => chartLeft + (trend.length === 1 ? chartWidth / 2 : i * step);
+  const maxMnc = Math.max(...trend.map(d => d.mncs), 1) * 1.35;
+  const maxPb = Math.max(...trend.map(d => d.payback), 1, 20) * 1.35;
+  const maxSpend = Math.max(...trend.map(d => d.spend), 1) * 1.35;
+  const maxLtv = Math.max(...trend.map(d => d.ltv), 1) * 1.35;
+
+  const step = trend.length > 1 ? cW / (trend.length - 1) : 0;
+  const getY = (val, max) => pY + cH - ((val / max) * cH);
+  const getX = (i) => pL + i * step;
 
   const buildPath = (pts) => pts.map((p, i) => `${i === 0 ? 'M' : 'L'} ${p.x} ${p.y}`).join(' ');
+
   const spendPoints = trend.map((d, i) => ({ x: getX(i), y: getY(d.spend, maxSpend) }));
-  const paybackPoints = trend.map((d, i) => ({ x: getX(i), y: getY(d.payback, maxPayback) }));
+  const paybackPoints = trend.map((d, i) => ({ x: getX(i), y: getY(d.payback, maxPb) }));
   const ltvPoints = trend.map((d, i) => ({ x: getX(i), y: getY(d.ltv, maxLtv) }));
 
-  const formatChangeBadge = (val) => {
-    if (val == null || isNaN(val) || !isFinite(val)) return <span className="text-slate-300">-</span>;
+  const ChangeBadge = ({ val }) => {
+    if (val === null || !isFinite(val) || val === 0) return <span className="text-slate-300">-</span>;
     const isPos = val >= 0;
     return (
-      <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-[9px] font-black uppercase ${isPos ? 'bg-green-50 text-green-600' : 'bg-red-50 text-red-600'}`}>
-        {isPos ? <ArrowUpRight size={10} className="mr-0.5" /> : <ArrowDownRight size={10} className="mr-0.5" />}
-        {(val * 100).toFixed(0)}%
+      <span className={`px-2 py-0.5 rounded-full text-[10px] font-black ${isPos ? 'bg-green-50 text-green-600' : 'bg-red-50 text-red-600'}`}>
+        {isPos ? '+' : ''}{(val * 100).toFixed(0)}%
       </span>
     );
   };
 
   return (
-    <div className="bg-white rounded-[2.5rem] shadow-2xl border border-slate-100 flex flex-col mb-20 overflow-visible">
+    <div className="bg-white rounded-[2.5rem] shadow-2xl border border-slate-100 flex flex-col mb-20 overflow-visible page-break-inside-avoid">
       <div className="bg-[#1a3812] px-10 py-6 border-b border-slate-200 flex justify-between items-center rounded-t-[2.5rem]">
-        <h3 className="text-2xl font-black text-white uppercase tracking-tighter flex items-center leading-none">
-          <ChevronRight size={24} className="mr-2 text-green-400" />
-          {title}
+        <h3 className="text-2xl font-black text-white uppercase tracking-tighter flex items-center">
+          <Icons.ChevronRight size={24} className="mr-2 text-green-400" /> {title}
         </h3>
-        <span className="text-[9px] text-white/40 font-black uppercase tracking-[0.4em]">{isGlobal ? 'Global Data Stream' : 'Regional Data Stream'}</span>
+        <span className="text-[9px] text-white/40 font-black uppercase tracking-[0.4em]">{isGlobal ? 'Regional Synthesis' : 'Market Analysis'}</span>
       </div>
       
-      <div className="p-10 space-y-16">
-        <div className="w-full bg-white overflow-visible">
-          <svg viewBox={`0 0 ${svgWidth} ${svgHeight}`} className="w-full h-auto overflow-visible font-sans select-none block chart-component-svg">
+      <div className="p-10 space-y-12">
+        <div className="w-full bg-white overflow-visible border-b border-slate-50 pb-8">
+          <svg viewBox={`0 0 ${svgWidth} ${svgHeight}`} className="w-full h-auto overflow-visible block">
             <defs>
               <filter id="halo" x="-50%" y="-50%" width="200%" height="200%">
                 <feFlood floodColor="white" result="bg" />
@@ -160,419 +129,271 @@ const PlatformDashboard = ({
                 <feMerge><feMergeNode in="outline" /><feMergeNode in="SourceGraphic" /></feMerge>
               </filter>
             </defs>
-            {[0, 0.25, 0.5, 0.75, 1].map(r => (
-              <line key={`g-${r}`} x1={chartLeft} y1={paddingY + chartHeight * r} x2={chartRight} y2={paddingY + chartHeight * r} stroke="#f1f5f9" strokeWidth="1.5" />
-            ))}
-            <line x1={chartLeft} y1={getY(15, maxPayback)} x2={chartRight} y2={getY(15, maxPayback)} stroke="#94a3b8" strokeWidth="2" strokeDasharray="10 10" />
+            {[0, 0.25, 0.5, 0.75, 1].map(r => <line key={r} x1={pL} y1={pY + cH * r} x2={svgWidth - pR} y2={pY + cH * r} stroke="#f1f5f9" strokeWidth="1" />)}
             
-            {[0, 0.25, 0.5, 0.75, 1].map(r => {
-              const y = paddingY + chartHeight * r, f = 1 - r;
-              return (
-                <g key={`lbl-${r}`} className="text-[10px] font-black opacity-30">
-                  <text x={chartLeft - 10} y={y + 4} textAnchor="end" fill="#6366f1">{Math.round(maxMnc * f)}</text>
-                  <text x={chartRight + 10} y={y + 4} textAnchor="start" fill="#10b981">£{Math.round(maxLtv * f)}</text>
-                </g>
-              );
-            })}
-            <path d={buildPath(spendPoints)} fill="none" stroke="#ef4444" strokeWidth="3" />
-            <path d={buildPath(ltvPoints)} fill="none" stroke="#10b981" strokeWidth="2.5" strokeDasharray="8 6" />
+            {/* Trend Lines - RESTORED */}
+            <path d={buildPath(spendPoints)} fill="none" stroke="#ef4444" strokeWidth="3" opacity="0.4" />
+            <path d={buildPath(ltvPoints)} fill="none" stroke="#10b981" strokeWidth="2.5" strokeDasharray="6 4" opacity="0.4" />
             <path d={buildPath(paybackPoints)} fill="none" stroke="#f59e0b" strokeWidth="4" />
-            
+
             {trend.map((d, i) => {
-              const x = getX(i), hasSpend = d.spend > 0;
-              const mncH = (d.mncs / maxMnc) * chartHeight, mncY = paddingY + chartHeight - mncH;
-              const spendY = getY(d.spend, maxSpend), pbY = getY(d.payback, maxPayback), ltvY = getY(d.ltv, maxLtv);
-              const pills = hasSpend ? [
+              const x = getX(i);
+              const mncH = (d.mncs / maxMnc) * cH;
+              const pbY = getY(d.payback, maxPb);
+              const spendY = getY(d.spend, maxSpend);
+              const ltvY = getY(d.ltv, maxLtv);
+              
+              // Pill label logic with collision avoidance
+              const labels = [
                 { id: 's', val: `£${Math.round(d.spend/1000)}k`, y: spendY, color: '#ef4444' },
                 { id: 'pb', val: `${d.payback.toFixed(1)}m`, y: pbY, color: '#f59e0b' },
-                { id: 'ltv', val: `£${Math.round(d.ltv)}`, y: ltvY, color: '#10b981' },
-                { id: 'mnc', val: Math.round(d.mncs), y: mncY, color: '#6366f1' }
-              ] : [];
-              if (hasSpend) {
-                pills.sort((a,b) => a.y - b.y);
-                for(let k=1; k<pills.length; k++){ if(pills[k].y - pills[k-1].y < 24) pills[k].y = pills[k-1].y + 24; }
-              }
+                { id: 'ltv', val: `£${Math.round(d.ltv)}`, y: ltvY, color: '#10b981' }
+              ].sort((a, b) => a.y - b.y);
+
+              if (labels[1].y - labels[0].y < 24) labels[1].y = labels[0].y + 24;
+              if (labels[2].y - labels[1].y < 24) labels[2].y = labels[1].y + 24;
+
               return (
-                <g key={`data-${i}`}>
-                  <rect x={x - barWidth/2} y={mncY} width={barWidth} height={mncH} fill="#6366f1" fillOpacity={hasSpend ? 1 : 0.2} rx={4} />
-                  {hasSpend && (
-                    <>
-                      <circle cx={x} cy={spendY} r="4" fill="#ef4444" stroke="#fff" strokeWidth="2" />
-                      <circle cx={x} cy={pbY} r="4" fill="#f59e0b" stroke="#fff" strokeWidth="2" />
-                      <circle cx={x} cy={ltvY} r="4" fill="#10b981" stroke="#fff" strokeWidth="2" />
-                      {pills.map(p => (
-                        <g key={p.id}>
-                          <rect x={x - 20} y={p.y - 28} width={40} height={18} rx={9} fill="white" stroke={p.color} strokeWidth="1.2" />
-                          <text x={x} y={p.y - 16} textAnchor="middle" fill={p.color} fontSize="8" fontWeight="900" filter="url(#halo)">{p.val}</text>
-                        </g>
-                      ))}
-                    </>
-                  )}
-                  <text x={x} y={paddingY + chartHeight + 40} textAnchor="middle" fill="#94a3b8" fontSize="9" fontWeight="900" transform={`rotate(-35, ${x}, ${paddingY + chartHeight + 40})`}>{d.month}</text>
+                <g key={i}>
+                  <rect x={x - 15} y={pY + cH - mncH} width={30} height={mncH} fill="#6366f1" fillOpacity={d.spend > 0 ? 0.8 : 0.2} rx={4} />
+                  
+                  {d.spend > 0 && labels.map(lbl => (
+                    <g key={lbl.id}>
+                      <rect x={x - 20} y={lbl.y - 30} width={40} height={18} rx={9} fill="white" stroke={lbl.color} strokeWidth="1.2" />
+                      <text x={x} y={lbl.y - 18} textAnchor="middle" fill={lbl.color} fontSize="9" fontWeight="900" filter="url(#halo)">{lbl.val}</text>
+                    </g>
+                  ))}
+                  
+                  <circle cx={x} cy={pbY} r="5" fill="#f59e0b" stroke="white" strokeWidth="2" />
+                  <circle cx={x} cy={spendY} r="4" fill="#ef4444" stroke="white" strokeWidth="1.5" />
+                  
+                  <text x={x} y={pY + cH + 30} textAnchor="middle" fill="#94a3b8" fontSize="10" fontWeight="bold" transform={`rotate(-35, ${x}, ${pY + cH + 30})`}>{d.month}</text>
                 </g>
               );
             })}
           </svg>
         </div>
 
-        {/* CONTRIBUTION MATRIX TABLE */}
-        <div className="space-y-6">
-          <div className="flex items-center space-x-3 text-indigo-600 opacity-60 px-2">
-             <Globe size={18} />
-             <h4 className="font-black text-[10px] uppercase tracking-[0.3em]">{isGlobal ? 'Regional Contribution Matrix' : 'Market Contribution Matrix'}</h4>
-          </div>
-          <div className="bg-white border border-slate-100 rounded-[2rem] overflow-hidden shadow-sm">
-            <table className="w-full text-center text-xs">
-              <thead className="bg-slate-50 border-b border-slate-200 text-slate-400 font-black uppercase tracking-widest">
-                <tr>
-                  <th className="py-5 px-8 text-left">{isGlobal ? 'Region' : 'Market'}</th>
-                  <th className="py-5 px-6">Investment</th>
-                  <th className="py-5 px-6">MNCs</th>
-                  <th className="py-5 px-4">MoM %</th>
-                  <th className="py-5 px-4">YoY %</th>
-                  <th className="py-5 px-6 text-[#ef4444]">CPA</th>
-                  <th className="py-5 px-6 text-[#10b981]">LTV</th>
-                  <th className="py-5 px-6 text-[#f59e0b]">PB</th>
+        <div className="bg-white border border-slate-100 rounded-[2rem] overflow-hidden shadow-sm">
+          <table className="w-full text-center text-xs">
+            <thead className="bg-slate-50 border-b text-slate-400 font-black uppercase tracking-widest">
+              <tr>
+                <th className="py-5 px-8 text-left">{isGlobal ? 'Region' : 'Market'}</th>
+                <th className="py-5 px-4 text-right">Investment</th>
+                <th className="py-5 px-4 text-right">MNCs</th>
+                <th className="py-5 px-4">MoM%</th>
+                <th className="py-5 px-4">YoY%</th>
+                <th className="py-5 px-4 text-[#ef4444]">CPA</th>
+                <th className="py-5 px-4 text-right pr-10">PB</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-slate-50 font-bold">
+              {contributionList.map((item, i) => (
+                <tr key={i} className="hover:bg-slate-50/50">
+                  <td className="py-4 px-8 text-left uppercase text-slate-900 font-black">{item.label}</td>
+                  <td className="py-4 px-4 text-right text-slate-500">{formatCurrency(item.spend)}</td>
+                  <td className="py-4 px-4 text-right text-slate-900">{formatNumber(item.mncs)}</td>
+                  <td className="py-4 px-4"><ChangeBadge val={item.momChange} /></td>
+                  <td className="py-4 px-4"><ChangeBadge val={item.yoyChange} /></td>
+                  <td className="py-4 px-4 text-[#ef4444] font-black">{formatCPA(item.cpa)}</td>
+                  <td className="py-4 px-4 text-right pr-10 text-slate-900 font-black">{item.payback.toFixed(1)}m</td>
                 </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-100 font-bold">
-                {contributionList.slice(0, 12).map((item, i) => (
-                  <tr key={`item-${i}`} className="hover:bg-slate-50/50 transition-colors">
-                    <td className="py-4 px-8 text-left uppercase text-slate-900 text-sm tracking-tight">{item.label}</td>
-                    <td className="py-4 px-6 text-slate-500 font-medium">{formatCurrency(item.spend)}</td>
-                    <td className="py-4 px-6 text-slate-900 font-black">{formatNumber(item.mncs)}</td>
-                    <td className="py-4 px-4">{formatChangeBadge(item.momChange)}</td>
-                    <td className="py-4 px-4">{formatChangeBadge(item.yoyChange)}</td>
-                    <td className="py-4 px-6 text-[#ef4444] font-black">{formatCPA(item.cpa)}</td>
-                    <td className="py-4 px-6 text-[#10b981]">£{Math.round(item.ltv)}</td>
-                    <td className="py-4 px-6 text-[#f59e0b] font-black">{item.payback.toFixed(1)}m</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+              ))}
+            </tbody>
+          </table>
         </div>
 
-        <div className="space-y-12 border-t border-slate-100 pt-12">
-          <div className="space-y-6">
-            <div className="flex items-center justify-between px-2">
-                <div className="flex items-center space-x-3 text-[#1a3812]">
-                  <MessageSquare size={24} />
-                  <h4 className="font-black text-sm uppercase tracking-widest">Strategic Narrative</h4>
+        <div className="space-y-6 pt-8 border-t border-slate-50">
+            <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2 text-[#1a3812]">
+                   <Icons.Message size={20} />
+                   <h4 className="font-black text-sm uppercase tracking-widest">Strategic Narrative</h4>
                 </div>
-                <button onClick={() => onAutoGenerate(title)} className="no-print flex items-center text-[10px] font-black text-green-700 bg-green-50 px-4 py-2 rounded-full border border-green-200 hover:bg-green-100 transition-all">
-                  <Sparkles size={14} className="mr-2" /> Sync Context
-                </button>
+                <button onClick={() => onNarrativeSync(title)} className="text-[10px] font-black uppercase text-green-700 bg-green-50 px-3 py-1 rounded-full border border-green-100 hover:bg-green-100 no-print">Sync Data</button>
             </div>
-            <AutoExpandingTextarea
-              value={commentary || ''}
-              onChange={(e) => onCommentChange(title, e.target.value)}
-              className="p-8 text-[15px] font-medium text-slate-800 bg-slate-50 border border-slate-200 rounded-[2.5rem] leading-relaxed italic shadow-inner"
+            <textarea 
+               value={commentary || ''} 
+               onChange={(e) => onNarrativeSync(title, e.target.value)}
+               placeholder="Enter analysis here..."
+               className="w-full p-8 bg-slate-50 rounded-[2rem] border-0 text-slate-800 text-sm italic font-medium leading-relaxed min-h-[120px] focus:ring-2 focus:ring-green-100 resize-none"
             />
-          </div>
-          <div className="space-y-6">
-            <div className="flex items-center space-x-3 text-blue-900 px-2">
-                <Map size={24} />
-                <h4 className="font-black text-sm uppercase tracking-widest">Strategic Roadmap</h4>
-            </div>
-            <AutoExpandingTextarea
-              value={roadmap || ''}
-              onChange={(e) => onRoadmapChange(title, e.target.value)}
-              className="p-8 text-[15px] font-medium text-slate-800 bg-blue-50/10 border border-blue-50 rounded-[2.5rem] leading-relaxed shadow-inner"
-            />
-          </div>
         </div>
       </div>
     </div>
   );
 };
 
-// --- MAIN APPLICATION ---
-
+// --- MAIN APP ---
 export default function App() {
   const [data, setData] = useState([]);
-  const [isProcessing, setIsProcessing] = useState(false);
   const [selectedRegion, setSelectedRegion] = useState('GLOBAL');
   const [selectedMonth, setSelectedMonth] = useState('');
-  const [selectedPlatforms, setSelectedPlatforms] = useState(Object.keys(PLATFORMS_MAP));
-  
-  const [comments, setComments] = useState(() => JSON.parse(localStorage.getItem('adv_v26_comm') || '{}'));
-  const [roadmaps, setRoadmaps] = useState(() => JSON.parse(localStorage.getItem('adv_v26_road') || '{}'));
-
-  useEffect(() => {
-    localStorage.setItem('adv_v26_comm', JSON.stringify(comments));
-    localStorage.setItem('adv_v26_road', JSON.stringify(roadmaps));
-  }, [comments, roadmaps]);
+  const [comments, setComments] = useState({});
+  const platforms = ['Google AC', 'TTD', 'Moloco'];
 
   const handleFileUpload = (e) => {
-    const file = e.target?.files?.[0] || e.dataTransfer?.files?.[0];
+    const file = e.target.files[0];
     if (!file) return;
-    
-    setIsProcessing(true);
     const reader = new FileReader();
-    reader.onload = (event) => {
-      try {
-        const parsed = parseCSV(event.target.result);
-        if (parsed.length > 0) {
-          setData(parsed);
-          const dates = [...new Set(parsed.map(d => d.date).filter(Boolean))].sort().reverse();
-          if (dates.length > 0) setSelectedMonth(dates[0] || '');
-        }
-      } catch (err) {} finally {
-        setTimeout(() => setIsProcessing(false), 600);
+    reader.onload = (ev) => {
+      const parsed = parseCSV(ev.target.result);
+      if (parsed.length) {
+        setData(parsed);
+        const dates = [...new Set(parsed.map(d => d.date))].sort().reverse();
+        setSelectedMonth(dates[0]);
       }
     };
     reader.readAsText(file);
   };
 
-  const aggregateData = (records) => {
-    let spend = 0, mncs = 0, ltvSum = 0, pbWeightedSum = 0;
+  const aggregate = (records) => {
+    let s = 0, m = 0, lSum = 0, pWSum = 0;
     records.forEach(r => {
-      const s = parseFloat(String(r.spend || 0).replace(/[^0-9.-]/g, ''));
-      const m = parseFloat(String(r.mncs || 0).replace(/[^0-9.-]/g, ''));
-      const p = parseFloat(String(r.payback || 0).replace(/[^0-9.-]/g, ''));
-      const l = parseFloat(String(r.ltv || 0).replace(/[^0-9.-]/g, ''));
-      spend += s;
-      mncs += m;
-      ltvSum += l * m;
-      pbWeightedSum += p * m; 
+      const spend = safeParseNum(r.spend);
+      const mncs = Math.round(safeParseNum(r.mncs));
+      const pb = safeParseNum(r.payback);
+      const ltv = safeParseNum(r.ltv);
+      s += spend; m += mncs; lSum += ltv * mncs; pWSum += pb * mncs;
     });
-    return { spend, mncs, cpa: mncs > 0 ? spend / mncs : 0, payback: mncs > 0 ? pbWeightedSum / mncs : 0, ltv: mncs > 0 ? ltvSum / mncs : 0 };
+    return { spend: s, mncs: m, cpa: m > 0 ? s / m : 0, payback: m > 0 ? pWSum / m : 0, ltv: m > 0 ? lSum / m : 0 };
   };
-
-  const getContextKey = (region, month, platform) => `${region}_${month}_${platform}`;
-  const availableMonths = useMemo(() => [...new Set(data.map(d => d.date).filter(Boolean))].sort().reverse(), [data]);
 
   const dashboardData = useMemo(() => {
-    if (data.length === 0 || !selectedMonth) return {};
-    const dashboards = {};
-    
-    const [year, month] = selectedMonth.split('-').map(Number);
-    const prevMonthDate = new Date(year, month - 2, 1);
-    const prevMonthStr = `${prevMonthDate.getFullYear()}-${String(prevMonthDate.getMonth() + 1).padStart(2, '0')}`;
-    const prevYearStr = `${year - 1}-${String(month).padStart(2, '0')}`;
+    if (!data.length || !selectedMonth) return {};
+    const res = {};
+    const [y, m] = selectedMonth.split('-').map(Number);
+    const pmS = `${m === 1 ? y-1 : y}-${String(m === 1 ? 12 : m-1).padStart(2, '0')}`;
+    const pyS = `${y-1}-${String(m).padStart(2, '0')}`;
 
-    selectedPlatforms.forEach(p => {
-      const shortName = PLATFORMS_MAP[p];
-      const trend = availableMonths.slice().sort().map(m => {
-        const monthData = data.filter(r => (selectedRegion === 'GLOBAL' || r.region?.toUpperCase() === selectedRegion) && r.date === m && r.platform === shortName);
-        return { month: m, ...aggregateData(monthData) };
+    platforms.forEach(p => {
+      const allDates = [...new Set(data.map(d => d.date))].sort();
+      const trend = allDates.map(date => {
+        const match = data.filter(r => (selectedRegion === 'GLOBAL' || r.region?.toUpperCase() === selectedRegion) && r.date === date && r.platform === p);
+        return { month: date, ...aggregate(match) };
       });
 
-      const currentContextData = data.filter(r => (selectedRegion === 'GLOBAL' || r.region?.toUpperCase() === selectedRegion) && r.date === selectedMonth && r.platform === shortName);
-      const uniqueKeys = [...new Set(currentContextData.map(r => selectedRegion === 'GLOBAL' ? (r.region?.toUpperCase() || 'UNKNOWN') : (r.country || 'UNKNOWN')))];
-
-      const contributionList = uniqueKeys.map(key => {
-        const itemFilter = (r) => (selectedRegion === 'GLOBAL' ? r.region?.toUpperCase() : r.country) === key && r.platform === shortName;
-        const curStats = aggregateData(data.filter(r => itemFilter(r) && r.date === selectedMonth));
-        const prevMonthStats = aggregateData(data.filter(r => itemFilter(r) && r.date === prevMonthStr));
-        const prevYearStats = aggregateData(data.filter(r => itemFilter(r) && r.date === prevYearStr));
-
-        const calcChange = (cur, prev) => (prev && prev !== 0) ? (cur - prev) / prev : null;
-
-        return {
-          label: key,
-          ...curStats,
-          momChange: calcChange(curStats.mncs, prevMonthStats.mncs),
-          yoyChange: calcChange(curStats.mncs, prevYearStats.mncs)
-        };
-      })
-      .filter(item => item.spend > 0)
-      .sort((a, b) => b.spend - a.spend);
-
-      dashboards[p] = { trend, contributionList };
+      const current = data.filter(r => (selectedRegion === 'GLOBAL' || r.region?.toUpperCase() === selectedRegion) && r.date === selectedMonth && r.platform === p);
+      const uniqueLabels = [...new Set(current.map(r => selectedRegion === 'GLOBAL' ? (r.region || 'Unknown') : (r.country || 'Unknown')))];
+      
+      const contributionList = uniqueLabels.map(label => {
+        const filterFn = (r) => (selectedRegion === 'GLOBAL' ? r.region : r.country) === label && r.platform === p;
+        const curAgg = aggregate(data.filter(r => filterFn(r) && r.date === selectedMonth));
+        const pmAgg = aggregate(data.filter(r => filterFn(r) && r.date === pmS));
+        const pyAgg = aggregate(data.filter(r => filterFn(r) && r.date === pyS));
+        return { label, ...curAgg, momChange: pmAgg.mncs ? (curAgg.mncs - pmAgg.mncs)/pmAgg.mncs : 0, yoyChange: pyAgg.mncs ? (curAgg.mncs - pyAgg.mncs)/pyAgg.mncs : 0 };
+      }).sort((a,b) => b.spend - a.spend);
+      
+      res[p] = { trend, contributionList };
     });
-    return dashboards;
-  }, [data, selectedRegion, selectedMonth, selectedPlatforms, availableMonths]);
+    return res;
+  }, [data, selectedRegion, selectedMonth]);
 
-  const tableData = useMemo(() => {
-    if (!selectedMonth || data.length === 0) return null;
-    const [year, month] = selectedMonth.split('-').map(Number);
-    const prevDate = new Date(year, month - 2, 1);
-    const prevStr = `${prevDate.getFullYear()}-${String(prevDate.getMonth() + 1).padStart(2, '0')}`;
-    const cur = aggregateData(data.filter(r => (selectedRegion === 'GLOBAL' || r.region?.toUpperCase() === selectedRegion) && r.date === selectedMonth && selectedPlatforms.some(p => PLATFORMS_MAP[p] === r.platform)));
-    const prev = aggregateData(data.filter(r => (selectedRegion === 'GLOBAL' || r.region?.toUpperCase() === selectedRegion) && r.date === prevStr && selectedPlatforms.some(p => PLATFORMS_MAP[p] === r.platform)));
-    const calcChange = (c, p) => (!p || p === 0) ? null : (c - p) / p;
-    return { currentTotal: cur, mom: { spend: calcChange(cur.spend, prev.spend), mncs: calcChange(cur.mncs, prev.mncs), payback: calcChange(cur.payback, prev.payback) } };
-  }, [data, selectedRegion, selectedMonth, selectedPlatforms]);
+  const mainKpis = useMemo(() => {
+    if (!data.length || !selectedMonth) return null;
+    const match = data.filter(r => (selectedRegion === 'GLOBAL' || r.region?.toUpperCase() === selectedRegion) && r.date === selectedMonth);
+    return aggregate(match);
+  }, [data, selectedRegion, selectedMonth]);
 
-  const handleAutoGenerateCommentary = (p) => {
-    const dash = dashboardData[p];
-    if (!dash) return;
-    const current = dash.trend.find(t => t.month === selectedMonth);
-    if (!current) return;
-    const sortedMonths = availableMonths.slice().sort();
-    const currentIdx = sortedMonths.indexOf(selectedMonth);
-    const prevMonth = currentIdx > 0 ? sortedMonths[currentIdx - 1] : null;
-    const prevData = prevMonth ? dash.trend.find(t => t.month === prevMonth) : null;
-    const mncDiff = prevData && prevData.mncs > 0 ? ((current.mncs - prevData.mncs) / prevData.mncs) * 100 : 0;
-    
-    const text = `${selectedMonth} analysis for ${p} in ${selectedRegion}:\nMonthly total reached ${new Intl.NumberFormat('en-US').format(current.mncs)} MNCs (${mncDiff >= 0 ? '+' : ''}${Math.round(mncDiff)}% MoM) at a ${current.payback.toFixed(1)}m MNC-weighted payback.\n\nContribution Summary:\n` + 
-      dash.contributionList.slice(0, 3).map(c => `- ${c.label}: ${new Intl.NumberFormat('en-US').format(c.mncs)} MNCs, ${c.payback.toFixed(1)}m PB`).join('\n');
-    
-    setComments(prev => ({ ...prev, [getContextKey(selectedRegion, selectedMonth, p)]: text }));
-  };
-
-  const formatCurrency = (val) => val != null ? new Intl.NumberFormat('en-GB', { style: 'currency', currency: 'GBP', minimumFractionDigits: 0, maximumFractionDigits: 0 }).format(val) : '-';
-  const formatCPA = (val) => val != null ? new Intl.NumberFormat('en-GB', { style: 'currency', currency: 'GBP', minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(val) : '-';
-  const formatNumber = (val) => val != null ? new Intl.NumberFormat('en-US', { maximumFractionDigits: 0 }).format(val) : '-';
-  const formatDecimal = (val) => val != null && val !== 0 ? new Intl.NumberFormat('en-US', { minimumFractionDigits: 1, maximumFractionDigits: 2 }).format(val) : '-';
-  const formatChange = (val, inv = false) => {
-    if (val == null) return <span className="text-slate-300">-</span>;
-    const f = new Intl.NumberFormat('en-US', { style: 'percent', minimumFractionDigits: 1, maximumFractionDigits: 1, signDisplay: 'always' }).format(val);
-    const good = (val > 0) !== inv;
-    return <span className={`font-black px-2 py-0.5 rounded-full text-[10px] uppercase ${good ? 'text-green-700 bg-green-50 border border-green-200' : 'text-red-700 bg-red-50 border border-red-200'}`}>{f}</span>;
+  const handleSync = (p, text = null) => {
+    const key = `${selectedRegion}_${selectedMonth}_${p}`;
+    if (typeof text === 'string') {
+        setComments(prev => ({ ...prev, [key]: text }));
+    } else {
+        const dash = dashboardData[p];
+        const cur = dash.trend.find(t => t.month === selectedMonth);
+        const autoText = `${selectedMonth} analysis for ${p} in ${selectedRegion}:\nGrowth of ${cur.mncs.toLocaleString()} MNCs achieved with a weighted payback of ${cur.payback.toFixed(1)}m.`;
+        setComments(prev => ({ ...prev, [key]: autoText }));
+    }
   };
 
   return (
-    <div className="report-root bg-[#f8fafc] font-sans block relative overflow-visible h-auto min-h-screen">
-      
-      {/* COMMAND HEADER */}
-      <nav className="w-full bg-[#1a3812] p-8 shadow-2xl flex flex-row items-center justify-between gap-10 border-b-[12px] border-green-900/30 no-print">
-        <div className="flex items-center space-x-6">
-          <div className="bg-white/10 p-3 rounded-[1rem] border border-white/10">
-            <BarChart3 size={32} className="text-green-400 w-8 h-8" />
-          </div>
-          <div>
-            <h1 className="text-3xl font-black text-white tracking-tighter leading-none italic uppercase">Monthly report tool</h1>
-            <p className="text-green-400/60 text-[9px] font-black uppercase tracking-[0.4em] mt-2">Enterprise Performance Intel</p>
-          </div>
+    <div className="min-h-screen bg-[#f8fafc] font-sans pb-32">
+      <nav className="w-full bg-[#1a3812] p-8 flex items-center justify-between no-print shadow-2xl border-b-[8px] border-green-900/20">
+        <div className="flex items-center space-x-4">
+          <div className="bg-white/10 p-2 rounded-xl"><Icons.Chart size={28} className="text-green-400" /></div>
+          <h1 className="text-2xl font-black text-white uppercase italic tracking-tighter">Monthly report tool</h1>
         </div>
-
-        <div className="ml-auto flex items-center gap-5">
+        <div className="flex items-center gap-6">
           {!data.length ? (
-            <div className="flex items-center gap-4">
-              {isProcessing ? (
-                <div className="flex items-center px-10 py-5 bg-white/10 text-white rounded-3xl font-black uppercase text-xs tracking-widest animate-pulse">
-                   <Loader2 size={20} className="mr-3 animate-spin" /> Processing...
-                </div>
-              ) : (
-                <label className="flex items-center px-10 py-5 bg-green-600 text-white rounded-3xl font-black uppercase text-xs tracking-widest cursor-pointer hover:bg-green-500 transition-all shadow-xl">
-                  <UploadCloud size={20} className="mr-3 w-5 h-5" /> Connect Data
-                  <input type="file" accept=".csv" className="hidden" onChange={handleFileUpload} />
-                </label>
-              )}
-            </div>
+            <label className="flex items-center px-10 py-4 bg-green-600 text-white rounded-2xl font-black uppercase text-xs cursor-pointer hover:bg-green-500 shadow-lg">
+              <Icons.Upload size={20} className="mr-3" /> Connect Data
+              <input type="file" accept=".csv" className="hidden" onChange={handleFileUpload} />
+            </label>
           ) : (
-            <div className="flex items-center gap-5">
-              <div className="flex items-center bg-white/10 p-2 rounded-3xl border border-white/10">
-                 <select value={selectedMonth || ''} onChange={(e) => setSelectedMonth(e.target.value)} className="bg-transparent text-white font-black px-4 py-2 outline-none cursor-pointer text-xs uppercase tracking-widest">
-                   {availableMonths.map(m => <option key={m} value={m} className="text-slate-900">{m}</option>)}
-                 </select>
-                 <div className="w-px h-6 bg-white/20 mx-3" />
-                 <select value={selectedRegion || ''} onChange={(e) => setSelectedRegion(e.target.value)} className="bg-transparent text-white font-black px-4 py-2 outline-none cursor-pointer text-xs uppercase tracking-widest">
-                   {REGIONS.map(r => <option key={r} value={r} className="text-slate-900">{r}</option>)}
-                 </select>
+            <div className="flex items-center gap-4">
+              <div className="flex bg-white/10 p-1 rounded-2xl border border-white/10">
+                <select value={selectedMonth} onChange={e => setSelectedMonth(e.target.value)} className="bg-transparent text-white font-bold px-4 py-2 outline-none text-xs">
+                  {[...new Set(data.map(d => d.date))].sort().reverse().map(d => <option key={d} value={d} className="text-black">{d}</option>)}
+                </select>
+                <select value={selectedRegion} onChange={e => setSelectedRegion(e.target.value)} className="bg-transparent text-white font-bold px-4 py-2 outline-none text-xs border-l border-white/10">
+                  {REGIONS.map(r => <option key={r} value={r} className="text-black">{r}</option>)}
+                </select>
               </div>
-              <button onClick={() => window.print()} className="flex items-center px-8 py-5 bg-white text-[#1a3812] rounded-3xl font-black uppercase text-xs tracking-widest hover:bg-green-50 transition-all shadow-xl">
-                 <Download size={18} className="mr-2 w-5 h-5 text-green-600" /> Export to PDF
-              </button>
-              <button onClick={() => {setData([]); setSelectedMonth('');}} className="p-4 bg-red-500/20 text-red-100 rounded-3xl hover:bg-red-600 transition-all">
-                 <XCircle size={18} className="w-5 h-5" />
-              </button>
+              <button onClick={() => window.print()} className="bg-white text-[#1a3812] px-8 py-4 rounded-2xl font-black text-xs uppercase shadow-lg">Export PDF</button>
+              <button onClick={() => setData([])} className="bg-red-500/20 p-4 rounded-2xl text-red-100 hover:bg-red-600"><Icons.X size={20} /></button>
             </div>
           )}
         </div>
       </nav>
 
-      {/* DOCUMENT BODY */}
-      <div className="report-content max-w-5xl mx-auto p-12 lg:p-16 overflow-visible h-auto block">
-        {tableData ? (
-          <div className="space-y-24 block overflow-visible animate-in fade-in duration-1000">
-            <header className="flex flex-col border-l-[10px] border-green-600 pl-12 py-6 mb-16 overflow-visible">
-                <h2 className="text-8xl lg:text-9xl font-black text-slate-900 tracking-tighter uppercase leading-[0.75]">
-                   {selectedRegion} <span className="text-green-600 block underline decoration-green-100 decoration-[10px] underline-offset-[20px]">{selectedMonth}</span>
-                </h2>
-                <p className="text-slate-400 font-black uppercase tracking-[0.8em] mt-16 text-[11px]">Growth Synthesis Dossier</p>
+      <div className="max-w-5xl mx-auto p-12">
+        {mainKpis ? (
+          <div className="space-y-16 animate-in fade-in duration-700">
+            <header className="border-l-[12px] border-green-600 pl-12 py-6 mb-20">
+              <h2 className="text-8xl font-black text-slate-900 tracking-tighter uppercase leading-none">
+                {selectedRegion} <span className="text-green-600 block">{selectedMonth}</span>
+              </h2>
+              <p className="text-slate-400 font-black uppercase tracking-[0.6em] mt-12 text-[11px]">Growth Synthesis Dossier</p>
             </header>
 
-            <div className="flex flex-col md:flex-row gap-6 overflow-visible w-full">
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
               {[
-                { label: 'Total Spend', value: formatCurrency(tableData.currentTotal.spend), change: tableData.mom.spend, inv: false },
-                { label: 'Total MNCs', value: formatNumber(tableData.currentTotal.mncs), change: tableData.mom.mncs, inv: false },
-                { label: 'Avg Payback', value: `${formatDecimal(tableData.currentTotal.payback)}m`, change: tableData.mom.payback, inv: true },
-              ].map((kpi, idx) => (
-                <div key={idx} className="flex-1 min-w-0 bg-white rounded-[3rem] p-10 border shadow-xl border-slate-50 flex flex-col justify-between hover:border-green-400 transition-all group overflow-visible">
-                  <span className="text-[11px] font-black text-slate-400 uppercase tracking-widest block mb-10">{kpi.label}</span>
-                  <div className="flex flex-col gap-4 overflow-visible">
-                    <span className="text-3xl lg:text-4xl font-black text-slate-900 tracking-tighter leading-none group-hover:text-green-700 transition-colors break-all">
-                       {kpi.value}
-                    </span>
-                    <div className="flex items-center gap-4 mt-2">
-                      {formatChange(kpi.change, kpi.inv)}
-                      <span className="text-[9px] font-black text-slate-300 uppercase tracking-widest">vs prev period</span>
-                    </div>
-                  </div>
+                { l: 'Total Investment', v: new Intl.NumberFormat('en-GB', { style: 'currency', currency: 'GBP', maximumFractionDigits: 0 }).format(mainKpis.spend) },
+                { l: 'Growth (MNCs)', v: new Intl.NumberFormat('en-US').format(mainKpis.mncs) },
+                { l: 'Weighted Payback', v: `${mainKpis.payback.toFixed(1)}m` },
+              ].map((k, i) => (
+                <div key={i} className="bg-white rounded-[3rem] p-12 border shadow-xl flex flex-col justify-between hover:scale-105 transition-transform">
+                  <span className="text-[11px] font-black text-slate-400 uppercase tracking-widest mb-10">{k.l}</span>
+                  <span className="text-4xl font-black text-slate-900 tracking-tighter">{k.v}</span>
                 </div>
               ))}
             </div>
 
-            <section className="space-y-32 block overflow-visible h-auto">
-              {selectedPlatforms.map(platform => {
-                const contextKey = getContextKey(selectedRegion, selectedMonth, platform);
-                return (
-                  <PlatformDashboard
-                    key={`dash-${platform}`}
-                    title={platform}
-                    dashboard={dashboardData[platform]}
-                    formatCurrency={formatCurrency}
-                    formatCPA={formatCPA}
-                    formatNumber={formatNumber}
-                    formatDecimal={formatDecimal}
-                    commentary={comments[contextKey]}
-                    roadmap={roadmaps[contextKey]}
-                    onCommentChange={(p, t) => setComments(prev => ({ ...prev, [getContextKey(selectedRegion, selectedMonth, p)]: t }))}
-                    onRoadmapChange={(p, t) => setRoadmaps(prev => ({ ...prev, [getContextKey(selectedRegion, selectedMonth, p)]: t }))}
-                    onAutoGenerate={handleAutoGenerateCommentary}
-                    isGlobal={selectedRegion === 'GLOBAL'}
-                  />
-                );
-              })}
-            </section>
+            {platforms.map(p => (
+              <PlatformDashboard 
+                key={p} title={p} dashboard={dashboardData[p]} 
+                formatCurrency={v => `£${Math.round(v/1000)}k`} 
+                formatCPA={v => `£${v.toFixed(2)}`} 
+                formatNumber={v => v.toLocaleString()}
+                isGlobal={selectedRegion === 'GLOBAL'}
+                onNarrativeSync={handleSync}
+                commentary={comments[`${selectedRegion}_${selectedMonth}_${p}`]}
+              />
+            ))}
           </div>
         ) : (
-          <div className="flex flex-col items-center justify-center min-h-[50vh] text-center no-print">
-            <div className="bg-white p-24 rounded-[5rem] shadow-2xl border border-slate-50 max-w-3xl">
-              <BarChart3 size={96} className="text-green-600 mx-auto mb-10 transform -rotate-12 w-24 h-24" />
-              <h3 className="text-6xl font-black text-slate-900 tracking-tighter mb-8 uppercase leading-none">Intelligence Hub</h3>
-              <p className="text-slate-400 font-bold mb-12 text-xl uppercase tracking-tight leading-relaxed max-w-xl mx-auto">
-                 Connect your <span className="text-slate-900 underline decoration-green-500 decoration-8">CSV marketing source</span> to generate the performance dossier.
-              </p>
+          <div className="flex flex-col items-center justify-center min-h-[60vh] text-center no-print">
+            <div className="bg-white p-24 rounded-[5rem] shadow-2xl border-4 border-dashed border-slate-100 max-w-3xl">
+              <Icons.Chart size={100} className="text-green-600 mx-auto mb-10 transform -rotate-12" />
+              <h3 className="text-6xl font-black text-slate-900 tracking-tighter mb-6 uppercase leading-none">Intelligence Hub</h3>
+              <p className="text-slate-400 font-bold mb-12 text-2xl">Connect your CSV source to begin synthesis.</p>
+              <label className="inline-flex items-center px-16 py-8 bg-[#1a3812] text-white rounded-[2.5rem] font-black uppercase cursor-pointer hover:scale-105 transition-all shadow-2xl">
+                <Icons.Upload size={24} className="mr-4" /> Select Data File
+                <input type="file" accept=".csv" className="hidden" onChange={handleFileUpload} />
+              </label>
             </div>
           </div>
         )}
       </div>
 
       <style dangerouslySetInnerHTML={{ __html: `
-        html, body, #root {
-          height: auto !important;
-          min-height: 100% !important;
-          overflow: visible !important;
-          display: block !important;
-          position: static !important;
-          width: 100% !important;
-          background: #f8fafc !important;
-        }
-
-        .chart-component-svg {
-          display: block !important;
-          width: 100% !important;
-          height: auto !important;
-          overflow: visible !important;
-        }
-        
-        svg:not(.chart-component-svg) {
-          width: 20px !important;
-          height: 20px !important;
-          display: inline-block;
-          vertical-align: middle;
-        }
-
-        .no-print { display: block; }
         @media print { 
           .no-print { display: none !important; }
-          .report-content { max-width: 100% !important; width: 100% !important; padding: 0 !important; }
+          body { background: white !important; }
+          .max-w-5xl { max-width: 100% !important; padding: 0 !important; width: 100% !important; }
         }
+        .animate-in { animation: fadeIn 0.8s ease-out; }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
       `}} />
     </div>
   );
