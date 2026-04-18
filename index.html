@@ -115,13 +115,13 @@
             );
         };
 
-        const ChangeBadge = ({ val, inverse = false, labelPrefix = "" }) => {
+        const ChangeBadge = ({ val, inverse = false }) => {
             if (val === null || !isFinite(val) || val === 0) return <span className="text-slate-300 text-[10px] font-black uppercase tracking-widest">-</span>;
             const isPos = val >= 0;
             const good = inverse ? !isPos : isPos;
             return (
-                <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-black ${good ? 'bg-green-50 text-green-600 border border-green-100' : 'bg-red-50 text-red-600 border border-red-100'}`}>
-                    {labelPrefix}{isPos ? '+' : ''}{(val * 100).toFixed(0)}%
+                <span className={`inline-flex items-center px-3 py-1 rounded-full text-[10px] font-black leading-none ${good ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}`}>
+                    {isPos ? '+' : ''}{(val * 100).toFixed(0)}%
                 </span>
             );
         };
@@ -284,9 +284,9 @@
                         {/* TABLE */}
                         <div className={`bg-white border border-slate-100 rounded-[2rem] overflow-hidden shadow-sm ${isOverall && region === 'GLOBAL' ? 'force-break-before' : ''}`}>
                             <table className="w-full text-center text-xs border-collapse">
-                                <thead className="bg-slate-50 border-b text-slate-400 font-black uppercase tracking-widest">
+                                <thead className="bg-[#1a2d1a] border-b text-white font-black uppercase tracking-widest">
                                     <tr>
-                                        <th className="py-5 px-8 text-left">{isOverall ? title : (isGlobal ? 'Region' : 'Market')}</th>
+                                        <th className="py-5 px-8 text-left">{isOverall ? region : (isGlobal ? 'Region' : 'Market')}</th>
                                         <th className="py-5 px-4 text-right">Spend</th>
                                         <th className="py-5 px-4 text-right">Regs</th>
                                         <th className="py-5 px-4 text-right">MNCs</th>
@@ -311,33 +311,33 @@
                                     ))}
                                 </tbody>
                                 {/* SUMMARY MOM/YOY ROWS */}
-                                <tfoot className="bg-green-50/30 border-t-2 border-slate-100">
+                                <tfoot className="bg-slate-50/50 border-t-2 border-slate-100">
                                     <tr>
-                                        <td className="py-4 px-8 text-left uppercase text-green-700 font-black">MoM %</td>
-                                        <td className="py-4 px-4 text-right"><ChangeBadge val={summaryTotals.mom.spend} labelPrefix="Spend " /></td>
-                                        <td className="py-4 px-4 text-right"><ChangeBadge val={summaryTotals.mom.regs} labelPrefix="Regs " /></td>
-                                        <td className="py-4 px-4 text-right"><ChangeBadge val={summaryTotals.mom.mncs} labelPrefix="MNC " /></td>
-                                        <td className="py-4 px-4"><ChangeBadge val={summaryTotals.mom.cvr} labelPrefix="CVR " /></td>
-                                        <td className="py-4 px-4 text-[#ef4444]"><ChangeBadge val={summaryTotals.mom.cpa} inverse labelPrefix="CPA " /></td>
-                                        <td className="py-4 px-4 text-[#10b981]"><ChangeBadge val={summaryTotals.mom.ltv} labelPrefix="LTV " /></td>
-                                        <td className="py-4 px-4 text-right pr-10"><ChangeBadge val={summaryTotals.mom.payback} inverse labelPrefix="PB " /></td>
+                                        <td className="py-5 px-8 text-left uppercase text-green-800 font-black text-[11px]">MoM %</td>
+                                        <td className="py-5 px-4 text-right"><ChangeBadge val={summaryTotals.mom.spend} /></td>
+                                        <td className="py-5 px-4 text-right"><ChangeBadge val={summaryTotals.mom.regs} /></td>
+                                        <td className="py-5 px-4 text-right"><ChangeBadge val={summaryTotals.mom.mncs} /></td>
+                                        <td className="py-5 px-4 text-center"><ChangeBadge val={summaryTotals.mom.cvr} /></td>
+                                        <td className="py-5 px-4 text-center"><ChangeBadge val={summaryTotals.mom.cpa} inverse /></td>
+                                        <td className="py-5 px-4 text-center"><ChangeBadge val={summaryTotals.mom.ltv} /></td>
+                                        <td className="py-5 px-4 text-right pr-10"><ChangeBadge val={summaryTotals.mom.payback} inverse /></td>
                                     </tr>
                                     <tr>
-                                        <td className="py-4 px-8 text-left uppercase text-green-700 font-black border-t border-slate-100/50">YoY %</td>
-                                        <td className="py-4 px-4 text-right border-t border-slate-100/50"><ChangeBadge val={summaryTotals.yoy.spend} labelPrefix="Spend " /></td>
-                                        <td className="py-4 px-4 text-right border-t border-slate-100/50"><ChangeBadge val={summaryTotals.yoy.regs} labelPrefix="Regs " /></td>
-                                        <td className="py-4 px-4 text-right border-t border-slate-100/50"><ChangeBadge val={summaryTotals.yoy.mncs} labelPrefix="MNC " /></td>
-                                        <td className="py-4 px-4 border-t border-slate-100/50"><ChangeBadge val={summaryTotals.yoy.cvr} labelPrefix="CVR " /></td>
-                                        <td className="py-4 px-4 text-[#ef4444] border-t border-slate-100/50"><ChangeBadge val={summaryTotals.yoy.cpa} inverse labelPrefix="CPA " /></td>
-                                        <td className="py-4 px-4 text-[#10b981] border-t border-slate-100/50"><ChangeBadge val={summaryTotals.yoy.ltv} labelPrefix="LTV " /></td>
-                                        <td className="py-4 px-4 text-right pr-10 border-t border-slate-100/50"><ChangeBadge val={summaryTotals.yoy.payback} inverse labelPrefix="PB " /></td>
+                                        <td className="py-5 px-8 text-left uppercase text-green-800 font-black text-[11px]">YoY %</td>
+                                        <td className="py-5 px-4 text-right border-t border-slate-100/50"><ChangeBadge val={summaryTotals.yoy.spend} /></td>
+                                        <td className="py-5 px-4 text-right border-t border-slate-100/50"><ChangeBadge val={summaryTotals.yoy.regs} /></td>
+                                        <td className="py-5 px-4 text-right border-t border-slate-100/50"><ChangeBadge val={summaryTotals.yoy.mncs} /></td>
+                                        <td className="py-5 px-4 text-center border-t border-slate-100/50"><ChangeBadge val={summaryTotals.yoy.cvr} /></td>
+                                        <td className="py-5 px-4 text-center border-t border-slate-100/50"><ChangeBadge val={summaryTotals.yoy.cpa} inverse /></td>
+                                        <td className="py-5 px-4 text-center border-t border-slate-100/50"><ChangeBadge val={summaryTotals.yoy.ltv} /></td>
+                                        <td className="py-5 px-4 text-right pr-10 border-t border-slate-100/50"><ChangeBadge val={summaryTotals.yoy.payback} inverse /></td>
                                     </tr>
                                 </tfoot>
                             </table>
                         </div>
 
                         {/* NARRATIVES */}
-                        {(isOverall || isGlobal) && (
+                        {(isOverall || region === 'GLOBAL') && (
                             <div className="flex flex-col space-y-10 pt-8 border-t border-slate-100">
                                 <div className="narrative-block space-y-4">
                                     <div className="flex items-center gap-2 text-[#1a3812]">
@@ -573,7 +573,7 @@ GBR: Switch back to registration optimised activity.`;
                         </div>
                         <div className="flex gap-4">
                             {!data.length ? (
-                                <label className="px-10 py-4 bg-green-600 text-white rounded-2xl font-black uppercase text-xs cursor-pointer shadow-lg hover:bg-green-50">
+                                <label className="px-10 py-4 bg-green-600 text-white rounded-2xl font-black uppercase text-xs cursor-pointer shadow-lg hover:bg-green-500">
                                     <Icons.Upload size={20} className="mr-3 inline" /> Connect Data
                                     <input type="file" accept=".csv" className="hidden" onChange={handleFileUpload} />
                                 </label>
@@ -633,7 +633,6 @@ GBR: Switch back to registration optimised activity.`;
                                                 dashboard={dash} 
                                                 isOverall={dash.title === 'Overall'} 
                                                 formatCurrency={formatAccurateCurrency} 
-                                                formatCPA={v => `£${v.toFixed(2)}`} 
                                                 formatNumber={v => v.toLocaleString()} 
                                                 isGlobal={rData.region === 'GLOBAL'} 
                                                 onNarrativeChange={(p, t) => setComments(prev => ({ ...prev, [`${rData.region}_${selectedMonth}_${p}`]: t }))} 
