@@ -115,15 +115,19 @@
             );
         };
 
-        const ChangeBadge = ({ val, inverse = false }) => {
+        const ChangeBadge = ({ val, inverse = false, labelPrefix = "" }) => {
             if (val === null || !isFinite(val) || val === 0) return <span className="text-slate-300 text-[10px] font-black uppercase tracking-widest">-</span>;
             const isPos = val >= 0;
             const good = inverse ? !isPos : isPos;
             return (
                 <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-black ${good ? 'bg-green-50 text-green-600 border border-green-100' : 'bg-red-50 text-red-600 border border-red-100'}`}>
-                    {isPos ? '+' : ''}{(val * 100).toFixed(0)}%
+                    {labelPrefix}{isPos ? '+' : ''}{(val * 100).toFixed(0)}%
                 </span>
             );
+        };
+
+        const formatAccurateCurrency = (v) => {
+            return new Intl.NumberFormat('en-GB', { style: 'currency', currency: 'GBP', minimumFractionDigits: 2 }).format(v);
         };
 
         // --- UTILS ---
@@ -152,6 +156,7 @@
                 if (raw.includes('region')) return 'region';
                 if (raw.includes('platform') || raw.includes('source') || raw.includes('vendor')) return 'platform';
                 if (raw.includes('mncs') || raw.includes('deposits') || raw.includes('conv')) return 'mncs';
+                if (raw.includes('regs') || raw.includes('registrations')) return 'regs';
                 if (raw.includes('ltv')) return 'ltv';
                 if (raw.includes('payback')) return 'payback';
                 if (raw.includes('spend') || raw.includes('cost')) return 'spend';
@@ -181,9 +186,9 @@
         const REGIONS = ['NORTHAM', 'LATAM', 'ASIA', 'PACIFIC', 'GBR', 'EUROPE', 'MEA'];
 
         // --- DASHBOARD COMPONENT ---
-        const PlatformDashboard = ({ region, title, dashboard, formatCurrency, formatCPA, formatNumber, isGlobal, onNarrativeChange, onRoadmapSync, commentary, roadmap, isOverall = false }) => {
+        const PlatformDashboard = ({ region, title, dashboard, formatCurrency, formatNumber, isGlobal, onNarrativeChange, onRoadmapSync, commentary, roadmap, isOverall = false }) => {
             if (!dashboard || dashboard.trend.length === 0) return null;
-            const { trend, contributionList } = dashboard;
+            const { trend, contributionList, summaryTotals } = dashboard;
             
             const svgWidth = 1000, svgHeight = 500; 
             const pL = 80, pR = 80, pY = 60, cW = svgWidth - pL - pR, cH = svgHeight - pY * 2;
@@ -254,15 +259,15 @@
                                 </svg>
                             </div>
                             
-                            {/* GRAPH LEGEND / DEFINITIONS */}
+                            {/* GRAPH LEGEND */}
                             <div className="flex flex-wrap items-center justify-center gap-x-8 gap-y-3 px-6 pb-2">
                                 <div className="flex items-center gap-2">
                                     <div className="w-4 h-1 bg-[#ef4444] rounded-full opacity-60"></div>
-                                    <span className="text-[10px] font-black uppercase text-slate-500 tracking-tight">Investment (Spend)</span>
+                                    <span className="text-[10px] font-black uppercase text-slate-500 tracking-tight">Investment</span>
                                 </div>
                                 <div className="flex items-center gap-2">
                                     <div className="w-3 h-3 bg-[#6366f1] rounded-sm opacity-80"></div>
-                                    <span className="text-[10px] font-black uppercase text-slate-500 tracking-tight">Growth (MNCs)</span>
+                                    <span className="text-[10px] font-black uppercase text-slate-500 tracking-tight">MNCs</span>
                                 </div>
                                 <div className="flex items-center gap-2">
                                     <div className="w-3 h-3 rounded-full border-2 border-[#f59e0b] bg-white"></div>
@@ -271,24 +276,24 @@
                                 </div>
                                 <div className="flex items-center gap-2">
                                     <div className="w-4 h-1 border-b-2 border-dashed border-[#10b981] opacity-60"></div>
-                                    <span className="text-[10px] font-black uppercase text-slate-500 tracking-tight">LTV (Lifetime Value)</span>
+                                    <span className="text-[10px] font-black uppercase text-slate-500 tracking-tight">LTV</span>
                                 </div>
                             </div>
                         </div>
 
-                        {/* TABLE - Pushed to Page 2 for Global Overall view */}
+                        {/* TABLE */}
                         <div className={`bg-white border border-slate-100 rounded-[2rem] overflow-hidden shadow-sm ${isOverall && region === 'GLOBAL' ? 'force-break-before' : ''}`}>
                             <table className="w-full text-center text-xs border-collapse">
                                 <thead className="bg-slate-50 border-b text-slate-400 font-black uppercase tracking-widest">
                                     <tr>
-                                        <th className="py-5 px-8 text-left">{isGlobal ? 'Region' : 'Market'}</th>
-                                        <th className="py-5 px-4 text-right">Investment</th>
+                                        <th className="py-5 px-8 text-left">{isOverall ? title : (isGlobal ? 'Region' : 'Market')}</th>
+                                        <th className="py-5 px-4 text-right">Spend</th>
+                                        <th className="py-5 px-4 text-right">Regs</th>
                                         <th className="py-5 px-4 text-right">MNCs</th>
-                                        <th className="py-5 px-4">MoM%</th>
-                                        <th className="py-5 px-4">YoY%</th>
+                                        <th className="py-5 px-4">CVR</th>
                                         <th className="py-5 px-4 text-[#ef4444]">CPA</th>
                                         <th className="py-5 px-4 text-[#10b981]">LTV</th>
-                                        <th className="py-5 px-4 text-right pr-10">PB</th>
+                                        <th className="py-5 px-4 text-right pr-10">Payback</th>
                                     </tr>
                                 </thead>
                                 <tbody className="divide-y divide-slate-50 font-bold">
@@ -296,20 +301,43 @@
                                         <tr key={i} className="hover:bg-slate-50/50 transition-colors">
                                             <td className="py-4 px-8 text-left uppercase text-slate-900 font-black">{item.label}</td>
                                             <td className="py-4 px-4 text-right text-slate-500 font-medium">{formatCurrency(item.spend)}</td>
+                                            <td className="py-4 px-4 text-right text-slate-900 font-black">{formatNumber(item.regs)}</td>
                                             <td className="py-4 px-4 text-right text-slate-900 font-black">{formatNumber(item.mncs)}</td>
-                                            <td className="py-4 px-4"><ChangeBadge val={item.momChange} /></td>
-                                            <td className="py-4 px-4"><ChangeBadge val={item.yoyChange} /></td>
-                                            <td className="py-4 px-4 text-[#ef4444] font-black">{formatCPA(item.cpa)}</td>
+                                            <td className="py-4 px-4 text-slate-500">{(item.cvr * 100).toFixed(1)}%</td>
+                                            <td className="py-4 px-4 text-[#ef4444] font-black">£{item.cpa.toFixed(2)}</td>
                                             <td className="py-4 px-4 text-[#10b981]">£{Math.round(item.ltv)}</td>
                                             <td className="py-4 px-4 text-right pr-10 text-slate-900 font-black">{item.payback.toFixed(1)}m</td>
                                         </tr>
                                     ))}
                                 </tbody>
+                                {/* SUMMARY MOM/YOY ROWS */}
+                                <tfoot className="bg-green-50/30 border-t-2 border-slate-100">
+                                    <tr>
+                                        <td className="py-4 px-8 text-left uppercase text-green-700 font-black">MoM %</td>
+                                        <td className="py-4 px-4 text-right"><ChangeBadge val={summaryTotals.mom.spend} labelPrefix="Spend " /></td>
+                                        <td className="py-4 px-4 text-right"><ChangeBadge val={summaryTotals.mom.regs} labelPrefix="Regs " /></td>
+                                        <td className="py-4 px-4 text-right"><ChangeBadge val={summaryTotals.mom.mncs} labelPrefix="MNC " /></td>
+                                        <td className="py-4 px-4"><ChangeBadge val={summaryTotals.mom.cvr} labelPrefix="CVR " /></td>
+                                        <td className="py-4 px-4 text-[#ef4444]"><ChangeBadge val={summaryTotals.mom.cpa} inverse labelPrefix="CPA " /></td>
+                                        <td className="py-4 px-4 text-[#10b981]"><ChangeBadge val={summaryTotals.mom.ltv} labelPrefix="LTV " /></td>
+                                        <td className="py-4 px-4 text-right pr-10"><ChangeBadge val={summaryTotals.mom.payback} inverse labelPrefix="PB " /></td>
+                                    </tr>
+                                    <tr>
+                                        <td className="py-4 px-8 text-left uppercase text-green-700 font-black border-t border-slate-100/50">YoY %</td>
+                                        <td className="py-4 px-4 text-right border-t border-slate-100/50"><ChangeBadge val={summaryTotals.yoy.spend} labelPrefix="Spend " /></td>
+                                        <td className="py-4 px-4 text-right border-t border-slate-100/50"><ChangeBadge val={summaryTotals.yoy.regs} labelPrefix="Regs " /></td>
+                                        <td className="py-4 px-4 text-right border-t border-slate-100/50"><ChangeBadge val={summaryTotals.yoy.mncs} labelPrefix="MNC " /></td>
+                                        <td className="py-4 px-4 border-t border-slate-100/50"><ChangeBadge val={summaryTotals.yoy.cvr} labelPrefix="CVR " /></td>
+                                        <td className="py-4 px-4 text-[#ef4444] border-t border-slate-100/50"><ChangeBadge val={summaryTotals.yoy.cpa} inverse labelPrefix="CPA " /></td>
+                                        <td className="py-4 px-4 text-[#10b981] border-t border-slate-100/50"><ChangeBadge val={summaryTotals.yoy.ltv} labelPrefix="LTV " /></td>
+                                        <td className="py-4 px-4 text-right pr-10 border-t border-slate-100/50"><ChangeBadge val={summaryTotals.yoy.payback} inverse labelPrefix="PB " /></td>
+                                    </tr>
+                                </tfoot>
                             </table>
                         </div>
 
-                        {/* NARRATIVES: Block grouped with break-inside avoid */}
-                        {(isOverall || region === 'GLOBAL') && (
+                        {/* NARRATIVES */}
+                        {(isOverall || isGlobal) && (
                             <div className="flex flex-col space-y-10 pt-8 border-t border-slate-100">
                                 <div className="narrative-block space-y-4">
                                     <div className="flex items-center gap-2 text-[#1a3812]">
@@ -356,18 +384,24 @@
             };
 
             const aggregate = (records) => {
-                let s = 0, m = 0, pWSum = 0, lSum = 0;
-                records.forEach(r => {
-                    const sp = safeParseNum(r.spend), mn = Math.round(safeParseNum(r.mncs)), pb = safeParseNum(r.payback), ltv = safeParseNum(r.ltv);
-                    s += sp; m += mn; pWSum += pb * mn; lSum += ltv * mn;
+                let s = 0, m = 0, r = 0, pWSum = 0, lSum = 0;
+                records.forEach(rec => {
+                    const sp = safeParseNum(rec.spend), mn = Math.round(safeParseNum(rec.mncs)), regs = Math.round(safeParseNum(rec.regs)), pb = safeParseNum(rec.payback), ltv = safeParseNum(rec.ltv);
+                    s += sp; m += mn; r += regs; pWSum += pb * mn; lSum += ltv * mn;
                 });
-                return { spend: s, mncs: m, cpa: m > 0 ? s / m : 0, payback: m > 0 ? pWSum / m : 0, ltv: m > 0 ? lSum / m : 0 };
+                return { 
+                    spend: s, mncs: m, regs: r, 
+                    cpa: m > 0 ? s / m : 0, 
+                    payback: m > 0 ? pWSum / m : 0, 
+                    ltv: m > 0 ? lSum / m : 0,
+                    cvr: r > 0 ? m / r : 0
+                };
             };
 
             const getRegionData = (region, month) => {
-                const [y, m] = month.split('-').map(Number);
-                const pmS = `${m === 1 ? y-1 : y}-${String(m === 1 ? 12 : m-1).padStart(2, '0')}`;
-                const pyS = `${y-1}-${String(m).padStart(2, '0')}`;
+                const [y, mNum] = month.split('-').map(Number);
+                const pmS = `${mNum === 1 ? y-1 : y}-${String(mNum === 1 ? 12 : mNum-1).padStart(2, '0')}`;
+                const pyS = `${y-1}-${String(mNum).padStart(2, '0')}`;
 
                 const regionDashboards = platforms.map(p => {
                     const allDates = [...new Set(data.map(d => d.date))].sort();
@@ -377,46 +411,68 @@
                     });
                     
                     const currentRecords = data.filter(r => (region === 'GLOBAL' || r.region?.toUpperCase() === region) && r.date === month && (p === 'Overall' || r.platform === p));
-                    const uniqueLabels = [...new Set(currentRecords.map(r => region === 'GLOBAL' ? r.region : r.country))].filter(l => l && l !== "" && l.toLowerCase() !== "unknown");
                     
-                    const tempContributionList = uniqueLabels.map(label => {
-                        const f = (r) => (region === 'GLOBAL' ? r.region : r.country) === label && (p === 'Overall' || r.platform === p);
-                        const curAgg = aggregate(data.filter(r => f(r) && r.date === month));
-                        const pmAgg = aggregate(data.filter(r => f(r) && r.date === pmS));
-                        const pyAgg = aggregate(data.filter(r => f(r) && r.date === pyS));
-                        return { label, ...curAgg, momChange: pmAgg.mncs ? (curAgg.mncs-pmAgg.mncs)/pmAgg.mncs : 0, yoyChange: pyAgg.mncs ? (curAgg.mncs-pyAgg.mncs)/pyAgg.mncs : 0 };
-                    }).filter(item => item.spend > 0 || item.mncs > 0);
+                    let contributionList = [];
+                    if (p === 'Overall') {
+                        // For Overall Dashboard, show Platform rows
+                        contributionList = ['Google AC', 'TTD', 'Moloco'].map(plat => {
+                            const f = (r) => (region === 'GLOBAL' || r.region?.toUpperCase() === region) && r.platform === plat;
+                            const curAgg = aggregate(data.filter(r => f(r) && r.date === month));
+                            return { label: plat, ...curAgg };
+                        }).filter(item => item.spend > 0 || item.mncs > 0);
+                    } else {
+                        // For Platform Dashboard, show Market/Region rows
+                        const uniqueLabels = [...new Set(currentRecords.map(r => region === 'GLOBAL' ? r.region : r.country))].filter(l => l && l !== "" && l.toLowerCase() !== "unknown");
+                        const tempContributionList = uniqueLabels.map(label => {
+                            const f = (r) => (region === 'GLOBAL' ? r.region : r.country) === label && r.platform === p;
+                            return { label, ...aggregate(data.filter(r => f(r) && r.date === month)) };
+                        }).filter(item => item.spend > 0 || item.mncs > 0);
 
-                    const activeMarkets = tempContributionList.filter(item => item.spend > 0);
-                    const noSpendMarkets = tempContributionList.filter(item => item.spend === 0 && item.mncs > 0);
-                    
-                    let contributionList = [...activeMarkets].sort((a,b) => b.spend - a.spend);
-                    
-                    if (noSpendMarkets.length > 0) {
-                        const restLabel = region === 'GLOBAL' ? "Rest of World" : `Rest of ${region}`;
-                        const totalMNCs = noSpendMarkets.reduce((acc, curr) => acc + curr.mncs, 0);
-                        const restAgg = {
-                            label: restLabel,
-                            spend: 0,
-                            mncs: totalMNCs,
-                            cpa: 0,
-                            payback: totalMNCs > 0 ? noSpendMarkets.reduce((acc, curr) => acc + (curr.payback * curr.mncs), 0) / totalMNCs : 0,
-                            ltv: totalMNCs > 0 ? noSpendMarkets.reduce((acc, curr) => acc + (curr.ltv * curr.mncs), 0) / totalMNCs : 0,
-                            momChange: 0,
-                            yoyChange: 0
-                        };
-                        contributionList.push(restAgg);
+                        const activeMarkets = tempContributionList.filter(item => item.spend > 0);
+                        const noSpendMarkets = tempContributionList.filter(item => item.spend === 0 && item.mncs > 0);
+                        contributionList = [...activeMarkets].sort((a,b) => b.spend - a.spend);
+                        if (noSpendMarkets.length > 0) {
+                            const restLabel = region === 'GLOBAL' ? "Rest of World" : `Rest of ${region}`;
+                            contributionList.push({ label: restLabel, ...aggregate(noSpendMarkets) });
+                        }
                     }
+
+                    // Calculation of Footer Summary Totals for MoM/YoY
+                    const curTotal = aggregate(data.filter(r => (region === 'GLOBAL' || r.region?.toUpperCase() === region) && r.date === month && (p === 'Overall' || r.platform === p)));
+                    const pmTotal = aggregate(data.filter(r => (region === 'GLOBAL' || r.region?.toUpperCase() === region) && r.date === pmS && (p === 'Overall' || r.platform === p)));
+                    const pyTotal = aggregate(data.filter(r => (region === 'GLOBAL' || r.region?.toUpperCase() === region) && r.date === pyS && (p === 'Overall' || r.platform === p)));
                     
-                    return { title: p, trend, contributionList };
+                    const calcPct = (c, p) => p > 0 ? (c - p) / p : 0;
+                    const summaryTotals = {
+                        mom: {
+                            spend: calcPct(curTotal.spend, pmTotal.spend),
+                            regs: calcPct(curTotal.regs, pmTotal.regs),
+                            mncs: calcPct(curTotal.mncs, pmTotal.mncs),
+                            cvr: calcPct(curTotal.cvr, pmTotal.cvr),
+                            cpa: calcPct(curTotal.cpa, pmTotal.cpa),
+                            ltv: calcPct(curTotal.ltv, pmTotal.ltv),
+                            payback: calcPct(curTotal.payback, pmTotal.payback)
+                        },
+                        yoy: {
+                            spend: calcPct(curTotal.spend, pyTotal.spend),
+                            regs: calcPct(curTotal.regs, pyTotal.regs),
+                            mncs: calcPct(curTotal.mncs, pyTotal.mncs),
+                            cvr: calcPct(curTotal.cvr, pyTotal.cvr),
+                            cpa: calcPct(curTotal.cpa, pyTotal.cpa),
+                            ltv: calcPct(curTotal.ltv, pyTotal.ltv),
+                            payback: calcPct(curTotal.payback, pyTotal.payback)
+                        }
+                    };
+                    
+                    return { title: p, trend, contributionList, summaryTotals };
                 });
 
                 const curStats = aggregate(data.filter(r => (region === 'GLOBAL' || r.region?.toUpperCase() === region) && r.date === month));
-                const prevStats = aggregate(data.filter(r => (region === 'GLOBAL' || r.region?.toUpperCase() === region) && r.date === pmS));
+                const pmStats = aggregate(data.filter(r => (region === 'GLOBAL' || r.region?.toUpperCase() === region) && r.date === pmS));
                 
                 return {
                     region,
-                    stats: { cur: curStats, mom: { s: prevStats.spend ? (curStats.spend-prevStats.spend)/prevStats.spend : 0, m: prevStats.mncs ? (curStats.mncs-prevStats.mncs)/prevStats.mncs : 0, p: prevStats.payback ? (curStats.payback-prevStats.payback)/prevStats.payback : 0 } },
+                    stats: { cur: curStats, mom: { s: pmStats.spend ? (curStats.spend-pmStats.spend)/pmStats.spend : 0, m: pmStats.mncs ? (curStats.mncs-pmStats.mncs)/pmStats.mncs : 0, p: pmStats.payback ? (curStats.payback-pmStats.payback)/pmStats.payback : 0 } },
                     dashboards: regionDashboards
                 };
             };
@@ -433,8 +489,8 @@
                 const cur = dash.trend.find(t => t.month === selectedMonth);
                 if (!cur || cur.mncs === 0) return "";
                 
-                const [y, m] = selectedMonth.split('-').map(Number);
-                const pmS = `${m === 1 ? y-1 : y}-${String(m === 1 ? 12 : m-1).padStart(2, '0')}`;
+                const [y, mNum] = selectedMonth.split('-').map(Number);
+                const pmS = `${mNum === 1 ? y-1 : y}-${String(mNum === 1 ? 12 : mNum-1).padStart(2, '0')}`;
                 const prevM = dash.trend.find(t => t.month === pmS);
                 const growth = prevM && prevM.mncs > 0 ? ((cur.mncs-prevM.mncs)/prevM.mncs*100).toFixed(0) : 0;
                 const pbGrowth = prevM && prevM.payback > 0 ? ((cur.payback-prevM.payback)/prevM.payback*100).toFixed(0) : 0;
@@ -466,7 +522,6 @@ Top MNC contributors: ${dash.contributionList.slice(0, 3).map(c => c.label).join
 Overall performance is ${cur.payback <= 15 ? 'efficient' : 'tracking above goal'}, ${cur.payback <= 15 ? 'tracking under' : 'currently exceeding'} the 15m goal. ${topContributor?.label} showed strong performance with a ${topContributor?.payback.toFixed(1)}m payback.`;
                 }
 
-                // Region-specific narrative
                 return `Strategic Narrative for ${region}:
 In ${monthName}, ${region} generated ${cur.mncs.toLocaleString()} total MNCs (${growth >= 0 ? '+' : ''}${growth}% MoM) at a weighted payback of ${cur.payback.toFixed(1)}m. ${topContributor?.label} stands as the primary growth driver for the region. Strategic focus remains on optimizing efficiency within high-velocity market segments and scaling BAU activity where payback tracking remains under the 15m goal.`;
             };
@@ -493,7 +548,6 @@ GBR: Switch back to registration optimised activity.`;
 • Evaluate incrementality results to calibrate vendor-level spend attribution for ${getMonthName(selectedMonth)}.`;
                 }
 
-                // Region-specific roadmap
                 const plans = {
                     'LATAM': 'Maintain performance while conducting incrementality tests to build certainty for GAC activity.',
                     'NORTHAM': 'USA conversion lift test and Creative Engine test.',
@@ -510,10 +564,6 @@ GBR: Switch back to registration optimised activity.`;
 • Conduct strategic testing to improve incremental performance results.`;
             };
 
-            const formatAccurateCurrency = (v) => {
-                return new Intl.NumberFormat('en-GB', { style: 'currency', currency: 'GBP', minimumFractionDigits: 2 }).format(v);
-            };
-
             return (
                 <div className="min-h-screen bg-[#f8fafc] pb-32">
                     <nav className="w-full bg-[#1a3812] p-8 flex items-center justify-between no-print shadow-2xl border-b-[8px] border-green-900/20">
@@ -523,7 +573,7 @@ GBR: Switch back to registration optimised activity.`;
                         </div>
                         <div className="flex gap-4">
                             {!data.length ? (
-                                <label className="px-10 py-4 bg-green-600 text-white rounded-2xl font-black uppercase text-xs cursor-pointer shadow-lg hover:bg-green-500">
+                                <label className="px-10 py-4 bg-green-600 text-white rounded-2xl font-black uppercase text-xs cursor-pointer shadow-lg hover:bg-green-50">
                                     <Icons.Upload size={20} className="mr-3 inline" /> Connect Data
                                     <input type="file" accept=".csv" className="hidden" onChange={handleFileUpload} />
                                 </label>
