@@ -15,19 +15,42 @@ const Icons = {
   ChevronRight: (p) => <Icon d="m9 18 6-6-6-6" {...p} />,
   X: (p) => <Icon d="M18 6 6 18M6 6l12 12" {...p} />,
   Message: (p) => <Icon d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" {...p} />,
-  Sparkles: (p) => <Icon d="m12 3 1.912 5.813a2 2 0 0 0 1.275 1.275L21 12l-5.813 1.912a2 2 0 0 0-1.275 1.275L12 21l-1.912-5.813a2 2 0 0 0-1.275-1.275L3 12l5.813-1.912a2 2 0 0 0 1.275-1.275L12 3Z" {...p} />,
   Map: (p) => <Icon d="M3 6l6-3 6 3 6-3v15l-6 3-6-3-6 3V6zm6-3v15m6-15v15" {...p} />,
   Up: (p) => <Icon d="M7 17L17 7M7 7h10v10" {...p} />,
   Down: (p) => <Icon d="M7 7l10 10M17 7v10H7" {...p} />
 };
 
-// --- UTILS & PARSING ---
+// --- HELPER COMPONENTS ---
+
+const AutoExpandingTextarea = ({ value, onChange, placeholder, className }) => {
+  const textareaRef = useRef(null);
+
+  useEffect(() => {
+    if (textareaRef.current) {
+      textareaRef.current.style.height = 'auto';
+      textareaRef.current.style.height = textareaRef.current.scrollHeight + 'px';
+    }
+  }, [value]);
+
+  return (
+    <textarea
+      ref={textareaRef}
+      value={value}
+      onChange={onChange}
+      placeholder={placeholder}
+      className={`w-full overflow-hidden resize-none transition-all duration-200 focus:ring-0 focus:outline-none ${className}`}
+    />
+  );
+};
+
+// --- UTILS ---
 const getMappedKey = (rawHeader) => {
   if (!rawHeader) return '';
   const h = rawHeader.toLowerCase().replace(/[^a-z0-9]/g, '');
   if (h.includes('month') || h.includes('date')) return 'date';
   if (h.includes('country')) return 'country';
-  if (h.includes('region')) return 'region';
+  if (h.includes('marketingregion')) return 'region';
+  if (h.includes('region') && !h.includes('country')) return 'region';
   if (h.includes('platform') || h.includes('source') || h.includes('vendor')) return 'platform';
   if (h.includes('mncs') || h.includes('deposits') || h.includes('conv')) return 'mncs';
   if (h.includes('ltv')) return 'ltv';
@@ -49,7 +72,6 @@ function parseCSV(text) {
   if (lines.length < 2) return [];
   const delimiter = lines[0].includes(';') ? ';' : ',';
   const headers = lines[0].split(delimiter).map(h => getMappedKey(h.trim().replace(/^"|"$/g, '')));
-  
   return lines.slice(1).map(line => {
     const values = line.split(delimiter).map(v => v.trim().replace(/^"|"$/g, ''));
     const obj = {};
@@ -74,9 +96,21 @@ function parseCSV(text) {
 const REGIONS = ['GLOBAL', 'NORTHAM', 'LATAM', 'ASIA', 'PACIFIC', 'GBR', 'EUROPE', 'ROW', 'MEA'];
 
 // --- COMPONENTS ---
+
+const ChangeBadge = ({ val, inverse = false }) => {
+  if (val === null || !isFinite(val) || val === 0) return <span className="text-slate-300 text-[10px] font-black uppercase tracking-widest">-</span>;
+  const isPos = val >= 0;
+  const good = inverse ? !isPos : isPos;
+  return (
+    <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-black ${good ? 'bg-green-50 text-green-600 border border-green-100' : 'bg-red-50 text-red-600 border border-red-100'}`}>
+      {isPos ? '+' : ''}{(val * 100).toFixed(0)}%
+    </span>
+  );
+};
+
 const PlatformDashboard = ({ 
   title, dashboard, formatCurrency, formatCPA, formatNumber, isGlobal,
-  onNarrativeSync, commentary
+  onNarrativeChange, onRoadmapSync, commentary, roadmap
 }) => {
   if (!dashboard || dashboard.trend.length === 0) return null;
   const { trend, contributionList } = dashboard;
@@ -99,26 +133,17 @@ const PlatformDashboard = ({
   const paybackPoints = trend.map((d, i) => ({ x: getX(i), y: getY(d.payback, maxPb) }));
   const ltvPoints = trend.map((d, i) => ({ x: getX(i), y: getY(d.ltv, maxLtv) }));
 
-  const ChangeBadge = ({ val }) => {
-    if (val === null || !isFinite(val) || val === 0) return <span className="text-slate-300">-</span>;
-    const isPos = val >= 0;
-    return (
-      <span className={`px-2 py-0.5 rounded-full text-[10px] font-black ${isPos ? 'bg-green-50 text-green-600' : 'bg-red-50 text-red-600'}`}>
-        {isPos ? '+' : ''}{(val * 100).toFixed(0)}%
-      </span>
-    );
-  };
-
   return (
-    <div className="bg-white rounded-[2.5rem] shadow-2xl border border-slate-100 flex flex-col mb-20 overflow-visible page-break-inside-avoid">
+    <div className="bg-white rounded-[2.5rem] shadow-2xl border border-slate-100 flex flex-col mb-24 overflow-visible page-break-inside-avoid">
       <div className="bg-[#1a3812] px-10 py-6 border-b border-slate-200 flex justify-between items-center rounded-t-[2.5rem]">
         <h3 className="text-2xl font-black text-white uppercase tracking-tighter flex items-center">
           <Icons.ChevronRight size={24} className="mr-2 text-green-400" /> {title}
         </h3>
-        <span className="text-[9px] text-white/40 font-black uppercase tracking-[0.4em]">{isGlobal ? 'Regional Synthesis' : 'Market Analysis'}</span>
+        <span className="text-[10px] text-white/40 font-black uppercase tracking-[0.4em]">{isGlobal ? 'Regional Synthesis' : 'Market Analysis'}</span>
       </div>
       
       <div className="p-10 space-y-12">
+        {/* GRAPH */}
         <div className="w-full bg-white overflow-visible border-b border-slate-50 pb-8">
           <svg viewBox={`0 0 ${svgWidth} ${svgHeight}`} className="w-full h-auto overflow-visible block">
             <defs>
@@ -131,7 +156,6 @@ const PlatformDashboard = ({
             </defs>
             {[0, 0.25, 0.5, 0.75, 1].map(r => <line key={r} x1={pL} y1={pY + cH * r} x2={svgWidth - pR} y2={pY + cH * r} stroke="#f1f5f9" strokeWidth="1" />)}
             
-            {/* Trend Lines - RESTORED */}
             <path d={buildPath(spendPoints)} fill="none" stroke="#ef4444" strokeWidth="3" opacity="0.4" />
             <path d={buildPath(ltvPoints)} fill="none" stroke="#10b981" strokeWidth="2.5" strokeDasharray="6 4" opacity="0.4" />
             <path d={buildPath(paybackPoints)} fill="none" stroke="#f59e0b" strokeWidth="4" />
@@ -139,15 +163,10 @@ const PlatformDashboard = ({
             {trend.map((d, i) => {
               const x = getX(i);
               const mncH = (d.mncs / maxMnc) * cH;
-              const pbY = getY(d.payback, maxPb);
-              const spendY = getY(d.spend, maxSpend);
-              const ltvY = getY(d.ltv, maxLtv);
-              
-              // Pill label logic with collision avoidance
               const labels = [
-                { id: 's', val: `£${Math.round(d.spend/1000)}k`, y: spendY, color: '#ef4444' },
-                { id: 'pb', val: `${d.payback.toFixed(1)}m`, y: pbY, color: '#f59e0b' },
-                { id: 'ltv', val: `£${Math.round(d.ltv)}`, y: ltvY, color: '#10b981' }
+                { id: 's', val: `£${Math.round(d.spend/1000)}k`, y: getY(d.spend, maxSpend), color: '#ef4444' },
+                { id: 'pb', val: `${d.payback.toFixed(1)}m`, y: getY(d.payback, maxPb), color: '#f59e0b' },
+                { id: 'ltv', val: `£${Math.round(d.ltv)}`, y: getY(d.ltv, maxLtv), color: '#10b981' }
               ].sort((a, b) => a.y - b.y);
 
               if (labels[1].y - labels[0].y < 24) labels[1].y = labels[0].y + 24;
@@ -156,17 +175,13 @@ const PlatformDashboard = ({
               return (
                 <g key={i}>
                   <rect x={x - 15} y={pY + cH - mncH} width={30} height={mncH} fill="#6366f1" fillOpacity={d.spend > 0 ? 0.8 : 0.2} rx={4} />
-                  
                   {d.spend > 0 && labels.map(lbl => (
                     <g key={lbl.id}>
                       <rect x={x - 20} y={lbl.y - 30} width={40} height={18} rx={9} fill="white" stroke={lbl.color} strokeWidth="1.2" />
                       <text x={x} y={lbl.y - 18} textAnchor="middle" fill={lbl.color} fontSize="9" fontWeight="900" filter="url(#halo)">{lbl.val}</text>
                     </g>
                   ))}
-                  
-                  <circle cx={x} cy={pbY} r="5" fill="#f59e0b" stroke="white" strokeWidth="2" />
-                  <circle cx={x} cy={spendY} r="4" fill="#ef4444" stroke="white" strokeWidth="1.5" />
-                  
+                  <circle cx={x} cy={getY(d.payback, maxPb)} r="5" fill="#f59e0b" stroke="white" strokeWidth="2" />
                   <text x={x} y={pY + cH + 30} textAnchor="middle" fill="#94a3b8" fontSize="10" fontWeight="bold" transform={`rotate(-35, ${x}, ${pY + cH + 30})`}>{d.month}</text>
                 </g>
               );
@@ -174,6 +189,7 @@ const PlatformDashboard = ({
           </svg>
         </div>
 
+        {/* MATRIX */}
         <div className="bg-white border border-slate-100 rounded-[2rem] overflow-hidden shadow-sm">
           <table className="w-full text-center text-xs">
             <thead className="bg-slate-50 border-b text-slate-400 font-black uppercase tracking-widest">
@@ -184,6 +200,7 @@ const PlatformDashboard = ({
                 <th className="py-5 px-4">MoM%</th>
                 <th className="py-5 px-4">YoY%</th>
                 <th className="py-5 px-4 text-[#ef4444]">CPA</th>
+                <th className="py-5 px-4 text-[#10b981]">LTV</th>
                 <th className="py-5 px-4 text-right pr-10">PB</th>
               </tr>
             </thead>
@@ -192,10 +209,11 @@ const PlatformDashboard = ({
                 <tr key={i} className="hover:bg-slate-50/50">
                   <td className="py-4 px-8 text-left uppercase text-slate-900 font-black">{item.label}</td>
                   <td className="py-4 px-4 text-right text-slate-500">{formatCurrency(item.spend)}</td>
-                  <td className="py-4 px-4 text-right text-slate-900">{formatNumber(item.mncs)}</td>
+                  <td className="py-4 px-4 text-right text-slate-900 font-black">{formatNumber(item.mncs)}</td>
                   <td className="py-4 px-4"><ChangeBadge val={item.momChange} /></td>
                   <td className="py-4 px-4"><ChangeBadge val={item.yoyChange} /></td>
                   <td className="py-4 px-4 text-[#ef4444] font-black">{formatCPA(item.cpa)}</td>
+                  <td className="py-4 px-4 text-[#10b981]">£{Math.round(item.ltv)}</td>
                   <td className="py-4 px-4 text-right pr-10 text-slate-900 font-black">{item.payback.toFixed(1)}m</td>
                 </tr>
               ))}
@@ -203,20 +221,34 @@ const PlatformDashboard = ({
           </table>
         </div>
 
-        <div className="space-y-6 pt-8 border-t border-slate-50">
-            <div className="flex items-center justify-between">
+        {/* NARRATIVES - UPDATED TO VERTICAL STACK WITH AUTO-EXPANDING TEXTAREAS */}
+        <div className="flex flex-col space-y-10 pt-8 border-t border-slate-100">
+            {/* Strategic Narrative Section */}
+            <div className="space-y-4">
                 <div className="flex items-center gap-2 text-[#1a3812]">
-                   <Icons.Message size={20} />
-                   <h4 className="font-black text-sm uppercase tracking-widest">Strategic Narrative</h4>
+                   <Icons.Message size={22} />
+                   <h4 className="font-black text-[13px] uppercase tracking-widest">Strategic Narrative</h4>
                 </div>
-                <button onClick={() => onNarrativeSync(title)} className="text-[10px] font-black uppercase text-green-700 bg-green-50 px-3 py-1 rounded-full border border-green-100 hover:bg-green-100 no-print">Sync Data</button>
+                <AutoExpandingTextarea 
+                   value={commentary || ''} 
+                   onChange={(e) => onNarrativeChange(title, e.target.value)}
+                   className="p-8 bg-slate-50 rounded-[2rem] border border-slate-100 text-slate-800 text-[15px] italic font-medium leading-relaxed"
+                />
             </div>
-            <textarea 
-               value={commentary || ''} 
-               onChange={(e) => onNarrativeSync(title, e.target.value)}
-               placeholder="Enter analysis here..."
-               className="w-full p-8 bg-slate-50 rounded-[2rem] border-0 text-slate-800 text-sm italic font-medium leading-relaxed min-h-[120px] focus:ring-2 focus:ring-green-100 resize-none"
-            />
+
+            {/* Next Month's Plans Section */}
+            <div className="space-y-4">
+                <div className="flex items-center gap-2 text-indigo-900">
+                    <Icons.Map size={22} />
+                    <h4 className="font-black text-[13px] uppercase tracking-widest">Next month's plans</h4>
+                </div>
+                <AutoExpandingTextarea 
+                   value={roadmap || ''} 
+                   onChange={(e) => onRoadmapSync(title, e.target.value)}
+                   className="p-8 bg-indigo-50/20 rounded-[2rem] border border-indigo-100/50 text-slate-800 text-[15px] font-medium leading-relaxed"
+                   placeholder="Enter planned optimizations, tactical shifts, and growth goals for the upcoming period..."
+                />
+            </div>
         </div>
       </div>
     </div>
@@ -224,11 +256,13 @@ const PlatformDashboard = ({
 };
 
 // --- MAIN APP ---
+
 export default function App() {
   const [data, setData] = useState([]);
   const [selectedRegion, setSelectedRegion] = useState('GLOBAL');
   const [selectedMonth, setSelectedMonth] = useState('');
   const [comments, setComments] = useState({});
+  const [roadmaps, setRoadmaps] = useState({});
   const platforms = ['Google AC', 'TTD', 'Moloco'];
 
   const handleFileUpload = (e) => {
@@ -271,39 +305,53 @@ export default function App() {
         const match = data.filter(r => (selectedRegion === 'GLOBAL' || r.region?.toUpperCase() === selectedRegion) && r.date === date && r.platform === p);
         return { month: date, ...aggregate(match) };
       });
-
       const current = data.filter(r => (selectedRegion === 'GLOBAL' || r.region?.toUpperCase() === selectedRegion) && r.date === selectedMonth && r.platform === p);
-      const uniqueLabels = [...new Set(current.map(r => selectedRegion === 'GLOBAL' ? (r.region || 'Unknown') : (r.country || 'Unknown')))];
-      
+      const uniqueLabels = [...new Set(current.map(r => selectedRegion === 'GLOBAL' ? r.region : r.country))];
       const contributionList = uniqueLabels.map(label => {
-        const filterFn = (r) => (selectedRegion === 'GLOBAL' ? r.region : r.country) === label && r.platform === p;
-        const curAgg = aggregate(data.filter(r => filterFn(r) && r.date === selectedMonth));
-        const pmAgg = aggregate(data.filter(r => filterFn(r) && r.date === pmS));
-        const pyAgg = aggregate(data.filter(r => filterFn(r) && r.date === pyS));
-        return { label, ...curAgg, momChange: pmAgg.mncs ? (curAgg.mncs - pmAgg.mncs)/pmAgg.mncs : 0, yoyChange: pyAgg.mncs ? (curAgg.mncs - pyAgg.mncs)/pyAgg.mncs : 0 };
+        const f = (r) => (selectedRegion === 'GLOBAL' ? r.region : r.country) === label && r.platform === p;
+        const cur = aggregate(data.filter(r => f(r) && r.date === selectedMonth));
+        const pm = aggregate(data.filter(r => f(r) && r.date === pmS));
+        const py = aggregate(data.filter(r => f(r) && r.date === pyS));
+        return { label, ...cur, momChange: pm.mncs ? (cur.mncs - pm.mncs)/pm.mncs : 0, yoyChange: py.mncs ? (cur.mncs - py.mncs)/py.mncs : 0 };
       }).sort((a,b) => b.spend - a.spend);
-      
       res[p] = { trend, contributionList };
     });
     return res;
   }, [data, selectedRegion, selectedMonth]);
 
-  const mainKpis = useMemo(() => {
+  const stats = useMemo(() => {
     if (!data.length || !selectedMonth) return null;
-    const match = data.filter(r => (selectedRegion === 'GLOBAL' || r.region?.toUpperCase() === selectedRegion) && r.date === selectedMonth);
-    return aggregate(match);
+    const [y, m] = selectedMonth.split('-').map(Number);
+    const pmS = `${m === 1 ? y-1 : y}-${String(m === 1 ? 12 : m-1).padStart(2, '0')}`;
+    const cur = aggregate(data.filter(r => (selectedRegion === 'GLOBAL' || r.region?.toUpperCase() === selectedRegion) && r.date === selectedMonth));
+    const prev = aggregate(data.filter(r => (selectedRegion === 'GLOBAL' || r.region?.toUpperCase() === selectedRegion) && r.date === pmS));
+    return { 
+      cur, 
+      mom: { 
+        spend: prev.spend ? (cur.spend - prev.spend)/prev.spend : 0,
+        mncs: prev.mncs ? (cur.mncs - prev.mncs)/prev.mncs : 0,
+        payback: prev.payback ? (cur.payback - prev.payback)/prev.payback : 0
+      }
+    };
   }, [data, selectedRegion, selectedMonth]);
 
-  const handleSync = (p, text = null) => {
+  // --- AUTOMATED NARRATIVE GENERATOR ---
+  const getNarrative = (p) => {
     const key = `${selectedRegion}_${selectedMonth}_${p}`;
-    if (typeof text === 'string') {
-        setComments(prev => ({ ...prev, [key]: text }));
-    } else {
-        const dash = dashboardData[p];
-        const cur = dash.trend.find(t => t.month === selectedMonth);
-        const autoText = `${selectedMonth} analysis for ${p} in ${selectedRegion}:\nGrowth of ${cur.mncs.toLocaleString()} MNCs achieved with a weighted payback of ${cur.payback.toFixed(1)}m.`;
-        setComments(prev => ({ ...prev, [key]: autoText }));
-    }
+    if (comments[key]) return comments[key];
+
+    const dash = dashboardData[p];
+    if (!dash) return "";
+    const cur = dash.trend.find(t => t.month === selectedMonth);
+    if (!cur || cur.mncs === 0) return "";
+
+    const [y, m] = selectedMonth.split('-').map(Number);
+    const pmS = `${m === 1 ? y-1 : y}-${String(m === 1 ? 12 : m-1).padStart(2, '0')}`;
+    const prevMonthData = dash.trend.find(t => t.month === pmS);
+    const mncChange = prevMonthData && prevMonthData.mncs > 0 ? ((cur.mncs - prevMonthData.mncs)/prevMonthData.mncs * 100).toFixed(0) : 0;
+    const topLabel = dash.contributionList[0]?.label || "N/A";
+
+    return `For ${selectedMonth}, ${p} performance in ${selectedRegion} reached a total volume of ${cur.mncs.toLocaleString()} MNCs (${mncChange >= 0 ? '+' : ''}${mncChange}% MoM) at a weighted payback of ${cur.payback.toFixed(1)}m. ${topLabel} stands as the primary growth driver for this period. Strategic focus remains on optimizing CPA efficiency across high-velocity segments.`;
   };
 
   return (
@@ -311,11 +359,11 @@ export default function App() {
       <nav className="w-full bg-[#1a3812] p-8 flex items-center justify-between no-print shadow-2xl border-b-[8px] border-green-900/20">
         <div className="flex items-center space-x-4">
           <div className="bg-white/10 p-2 rounded-xl"><Icons.Chart size={28} className="text-green-400" /></div>
-          <h1 className="text-2xl font-black text-white uppercase italic tracking-tighter">Monthly report tool</h1>
+          <h1 className="text-2xl font-black text-white uppercase italic tracking-tighter leading-none">Monthly report tool</h1>
         </div>
         <div className="flex items-center gap-6">
           {!data.length ? (
-            <label className="flex items-center px-10 py-4 bg-green-600 text-white rounded-2xl font-black uppercase text-xs cursor-pointer hover:bg-green-500 shadow-lg">
+            <label className="flex items-center px-10 py-4 bg-green-600 text-white rounded-2xl font-black uppercase text-xs cursor-pointer hover:bg-green-500 shadow-lg transition-all">
               <Icons.Upload size={20} className="mr-3" /> Connect Data
               <input type="file" accept=".csv" className="hidden" onChange={handleFileUpload} />
             </label>
@@ -329,32 +377,35 @@ export default function App() {
                   {REGIONS.map(r => <option key={r} value={r} className="text-black">{r}</option>)}
                 </select>
               </div>
-              <button onClick={() => window.print()} className="bg-white text-[#1a3812] px-8 py-4 rounded-2xl font-black text-xs uppercase shadow-lg">Export PDF</button>
-              <button onClick={() => setData([])} className="bg-red-500/20 p-4 rounded-2xl text-red-100 hover:bg-red-600"><Icons.X size={20} /></button>
+              <button onClick={() => window.print()} className="bg-white text-[#1a3812] px-8 py-4 rounded-2xl font-black text-xs uppercase shadow-lg hover:bg-green-50">Export PDF</button>
+              <button onClick={() => setData([])} className="bg-red-500/20 p-4 rounded-2xl text-red-100 hover:bg-red-600 transition-colors"><Icons.X size={20} /></button>
             </div>
           )}
         </div>
       </nav>
 
       <div className="max-w-5xl mx-auto p-12">
-        {mainKpis ? (
-          <div className="space-y-16 animate-in fade-in duration-700">
+        {stats ? (
+          <div className="space-y-16 animate-in fade-in duration-1000">
             <header className="border-l-[12px] border-green-600 pl-12 py-6 mb-20">
               <h2 className="text-8xl font-black text-slate-900 tracking-tighter uppercase leading-none">
                 {selectedRegion} <span className="text-green-600 block">{selectedMonth}</span>
               </h2>
-              <p className="text-slate-400 font-black uppercase tracking-[0.6em] mt-12 text-[11px]">Growth Synthesis Dossier</p>
+              <p className="text-slate-400 font-black uppercase tracking-[0.6em] mt-12 text-[11px]">Performance Intelligence Dossier</p>
             </header>
 
             <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
               {[
-                { l: 'Total Investment', v: new Intl.NumberFormat('en-GB', { style: 'currency', currency: 'GBP', maximumFractionDigits: 0 }).format(mainKpis.spend) },
-                { l: 'Growth (MNCs)', v: new Intl.NumberFormat('en-US').format(mainKpis.mncs) },
-                { l: 'Weighted Payback', v: `${mainKpis.payback.toFixed(1)}m` },
+                { l: 'Total Investment', v: new Intl.NumberFormat('en-GB', { style: 'currency', currency: 'GBP', maximumFractionDigits: 0 }).format(stats.cur.spend), ch: stats.mom.spend, inv: false },
+                { l: 'Growth (MNCs)', v: new Intl.NumberFormat('en-US').format(stats.cur.mncs), ch: stats.mom.mncs, inv: false },
+                { l: 'Weighted Payback', v: `${stats.cur.payback.toFixed(1)}m`, ch: stats.mom.payback, inv: true },
               ].map((k, i) => (
                 <div key={i} className="bg-white rounded-[3rem] p-12 border shadow-xl flex flex-col justify-between hover:scale-105 transition-transform">
-                  <span className="text-[11px] font-black text-slate-400 uppercase tracking-widest mb-10">{k.l}</span>
-                  <span className="text-4xl font-black text-slate-900 tracking-tighter">{k.v}</span>
+                  <div className="flex justify-between items-start mb-10">
+                    <span className="text-[11px] font-black text-slate-400 uppercase tracking-widest">{k.l}</span>
+                    <ChangeBadge val={k.ch} inverse={k.inv} />
+                  </div>
+                  <span className="text-5xl font-black text-slate-900 tracking-tighter leading-none">{k.v}</span>
                 </div>
               ))}
             </div>
@@ -366,8 +417,10 @@ export default function App() {
                 formatCPA={v => `£${v.toFixed(2)}`} 
                 formatNumber={v => v.toLocaleString()}
                 isGlobal={selectedRegion === 'GLOBAL'}
-                onNarrativeSync={handleSync}
-                commentary={comments[`${selectedRegion}_${selectedMonth}_${p}`]}
+                onNarrativeChange={(p, t) => setComments(prev => ({ ...prev, [`${selectedRegion}_${selectedMonth}_${p}`]: t }))}
+                onRoadmapSync={(p, t) => setRoadmaps(prev => ({ ...prev, [`${selectedRegion}_${selectedMonth}_${p}`]: t }))}
+                commentary={getNarrative(p)}
+                roadmap={roadmaps[`${selectedRegion}_${selectedMonth}_${p}`]}
               />
             ))}
           </div>
@@ -376,9 +429,9 @@ export default function App() {
             <div className="bg-white p-24 rounded-[5rem] shadow-2xl border-4 border-dashed border-slate-100 max-w-3xl">
               <Icons.Chart size={100} className="text-green-600 mx-auto mb-10 transform -rotate-12" />
               <h3 className="text-6xl font-black text-slate-900 tracking-tighter mb-6 uppercase leading-none">Intelligence Hub</h3>
-              <p className="text-slate-400 font-bold mb-12 text-2xl">Connect your CSV source to begin synthesis.</p>
+              <p className="text-slate-400 font-bold mb-12 text-2xl">Connect your CSV source to begin automated performance synthesis.</p>
               <label className="inline-flex items-center px-16 py-8 bg-[#1a3812] text-white rounded-[2.5rem] font-black uppercase cursor-pointer hover:scale-105 transition-all shadow-2xl">
-                <Icons.Upload size={24} className="mr-4" /> Select Data File
+                <Icons.Upload size={24} className="mr-4" /> Select Market Data
                 <input type="file" accept=".csv" className="hidden" onChange={handleFileUpload} />
               </label>
             </div>
