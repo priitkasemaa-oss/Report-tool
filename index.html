@@ -13,54 +13,46 @@
         @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;700;900&display=swap');
         body { font-family: 'Inter', sans-serif; -webkit-print-color-adjust: exact; }
         
-        /* Advanced Print Optimizations */
+        /* Advanced Print Layout & Grouping */
         @media print {
+            @page { 
+                margin: 15mm 10mm; /* Global margins for the page */
+            }
             .no-print { display: none !important; }
             body { background: white !important; padding: 0 !important; margin: 0 !important; }
             .max-w-5xl { max-width: 100% !important; padding: 0 !important; width: 100% !important; margin: 0 !important; }
             
-            /* Ensure each region starts fresh */
+            /* Add top spacing so content doesn't start immediately */
+            .page-top-margin {
+                padding-top: 1.5rem !important;
+            }
+
+            /* Each new region section starts on a fresh page */
             .region-section { 
                 page-break-before: always !important;
                 break-before: page !important;
-                padding-top: 1rem !important;
+                padding-top: 2rem !important;
             }
             .region-section:first-of-type {
                 page-break-before: avoid !important;
                 break-before: avoid !important;
+                padding-top: 0 !important;
             }
 
-            /* Logical Grouping: Keep units together */
-            .print-group {
-                page-break-inside: avoid !important;
-                break-inside: avoid !important;
-                display: block !important;
-                margin-bottom: 2rem !important;
+            /* Every Vendor/Platform section starts on its own page */
+            .platform-page-break {
+                page-break-before: always !important;
+                break-before: page !important;
+                padding-top: 2rem !important;
             }
 
-            /* Matrix Table specific grouping */
-            .matrix-container {
-                page-break-inside: avoid !important;
-                break-inside: avoid !important;
-            }
-            
-            /* Narrative specific grouping */
-            .narrative-container {
-                page-break-inside: avoid !important;
-                break-inside: avoid !important;
-                margin-top: 2rem !important;
-            }
-
+            /* Keep table rows together */
             tr { page-break-inside: avoid !important; break-inside: avoid !important; }
             thead { display: table-header-group !important; }
             
-            /* Remove shadows for cleaner PDF print */
+            /* Visual Cleanup */
             .shadow-2xl, .shadow-xl, .shadow-sm { box-shadow: none !important; border: 1px solid #f1f5f9 !important; }
-            
-            /* Adjust spacing for print density */
-            .space-y-32 { spacing: 4rem !important; margin-top: 4rem !important; }
-            .space-y-16 { spacing: 2rem !important; margin-top: 2rem !important; }
-            .p-12 { padding: 2rem !important; }
+            .ring-4 { ring: 0 !important; border-width: 1px !important; }
         }
 
         .animate-in { animation: fadeIn 0.8s ease-out; }
@@ -193,11 +185,10 @@
             const step = trend.length > 1 ? cW / (trend.length - 1) : 0;
             const getY = (val, max) => pY + cH - ((val / max) * cH);
             const getX = (i) => pL + i * step;
-
             const buildPath = (pts) => pts.map((p, i) => `${i === 0 ? 'M' : 'L'} ${p.x} ${p.y}`).join(' ');
 
             return (
-                <div className={`bg-white rounded-[2.5rem] shadow-2xl border border-slate-100 flex flex-col mb-24 overflow-visible ${isOverall ? 'border-indigo-100 ring-4 ring-indigo-50/50' : ''}`}>
+                <div className={`bg-white rounded-[2.5rem] shadow-2xl border border-slate-100 flex flex-col mb-12 overflow-visible page-top-margin ${isOverall ? 'border-indigo-100 ring-4 ring-indigo-50/50' : 'platform-page-break'}`}>
                     <div className={`${isOverall ? 'bg-indigo-900' : 'bg-[#1a3812]'} px-10 py-6 border-b border-slate-200 flex justify-between items-center rounded-t-[2.5rem]`}>
                         <h3 className="text-2xl font-black text-white uppercase tracking-tighter flex items-center">
                             {isOverall ? <Icons.Sparkles size={24} className="mr-2 text-indigo-400" /> : <Icons.ChevronRight size={24} className="mr-2 text-green-400" />}
@@ -206,55 +197,53 @@
                         <span className="text-[10px] text-white/40 font-black uppercase tracking-[0.4em]">{isGlobal ? 'Regional Synthesis' : 'Market Analysis'}</span>
                     </div>
                     
-                    <div className="p-10 space-y-12">
-                        {/* 1. GRAPH UNIT: Header + Graph */}
-                        <div className="print-group">
-                            <div className="w-full bg-white overflow-visible border-b border-slate-50 pb-8">
-                                <svg viewBox={`0 0 ${svgWidth} ${svgHeight}`} className="w-full h-auto overflow-visible block">
-                                    <defs>
-                                        <filter id="halo" x="-50%" y="-50%" width="200%" height="200%">
-                                            <feFlood floodColor="white" result="bg" /><feMorphology in="SourceAlpha" operator="dilate" radius="1.2" result="dilated" />
-                                            <feComposite in="bg" in2="dilated" operator="in" result="outline" /><feMerge><feMergeNode in="outline" /><feMergeNode in="SourceGraphic" /></feMerge>
-                                        </filter>
-                                    </defs>
-                                    {[0, 0.25, 0.5, 0.75, 1].map(r => <line key={r} x1={pL} y1={pY + cH * r} x2={svgWidth - pR} y2={pY + cH * r} stroke="#f1f5f9" strokeWidth="1" />)}
-                                    
-                                    <path d={buildPath(trend.map((d,i)=>({x:getX(i), y:getY(d.spend, maxSpend)})))} fill="none" stroke="#ef4444" strokeWidth="3" opacity="0.4" />
-                                    <path d={buildPath(trend.map((d,i)=>({x:getX(i), y:getY(d.ltv, maxLtv)})))} fill="none" stroke="#10b981" strokeWidth="2.5" strokeDasharray="6 4" opacity="0.4" />
-                                    <path d={buildPath(trend.map((d,i)=>({x:getX(i), y:getY(d.payback, maxPb)})))} fill="none" stroke="#f59e0b" strokeWidth="4" />
+                    <div className="p-10 space-y-10">
+                        {/* CHART */}
+                        <div className="w-full bg-white overflow-visible border-b border-slate-50 pb-8">
+                            <svg viewBox={`0 0 ${svgWidth} ${svgHeight}`} className="w-full h-auto overflow-visible block">
+                                <defs>
+                                    <filter id="halo" x="-50%" y="-50%" width="200%" height="200%">
+                                        <feFlood floodColor="white" result="bg" /><feMorphology in="SourceAlpha" operator="dilate" radius="1.2" result="dilated" />
+                                        <feComposite in="bg" in2="dilated" operator="in" result="outline" /><feMerge><feMergeNode in="outline" /><feMergeNode in="SourceGraphic" /></feMerge>
+                                    </filter>
+                                </defs>
+                                {[0, 0.25, 0.5, 0.75, 1].map(r => <line key={r} x1={pL} y1={pY + cH * r} x2={svgWidth - pR} y2={pY + cH * r} stroke="#f1f5f9" strokeWidth="1" />)}
+                                
+                                <path d={buildPath(trend.map((d,i)=>({x:getX(i), y:getY(d.spend, maxSpend)})))} fill="none" stroke="#ef4444" strokeWidth="3" opacity="0.4" />
+                                <path d={buildPath(trend.map((d,i)=>({x:getX(i), y:getY(d.ltv, maxLtv)})))} fill="none" stroke="#10b981" strokeWidth="2.5" strokeDasharray="6 4" opacity="0.4" />
+                                <path d={buildPath(trend.map((d,i)=>({x:getX(i), y:getY(d.payback, maxPb)})))} fill="none" stroke="#f59e0b" strokeWidth="4" />
 
-                                    {trend.map((d, i) => {
-                                        const x = getX(i);
-                                        const mncH = (d.mncs / maxMnc) * cH;
-                                        const labels = [
-                                            { id: 's', val: `£${Math.round(d.spend/1000)}k`, y: getY(d.spend, maxSpend), color: '#ef4444' },
-                                            { id: 'pb', val: `${d.payback.toFixed(1)}m`, y: getY(d.payback, maxPb), color: '#f59e0b' },
-                                            { id: 'ltv', val: `£${Math.round(d.ltv)}`, y: getY(d.ltv, maxLtv), color: '#10b981' }
-                                        ].sort((a, b) => a.y - b.y);
+                                {trend.map((d, i) => {
+                                    const x = getX(i);
+                                    const mncH = (d.mncs / maxMnc) * cH;
+                                    const labels = [
+                                        { id: 's', val: `£${Math.round(d.spend/1000)}k`, y: getY(d.spend, maxSpend), color: '#ef4444' },
+                                        { id: 'pb', val: `${d.payback.toFixed(1)}m`, y: getY(d.payback, maxPb), color: '#f59e0b' },
+                                        { id: 'ltv', val: `£${Math.round(d.ltv)}`, y: getY(d.ltv, maxLtv), color: '#10b981' }
+                                    ].sort((a, b) => a.y - b.y);
 
-                                        if (labels[1].y - labels[0].y < 24) labels[1].y = labels[0].y + 24;
-                                        if (labels[2].y - labels[1].y < 24) labels[2].y = labels[1].y + 24;
+                                    if (labels[1].y - labels[0].y < 24) labels[1].y = labels[0].y + 24;
+                                    if (labels[2].y - labels[1].y < 24) labels[2].y = labels[1].y + 24;
 
-                                        return (
-                                            <g key={i}>
-                                                <rect x={x - 15} y={pY + cH - mncH} width={30} height={mncH} fill="#6366f1" fillOpacity={d.spend > 0 ? 0.8 : 0.1} rx={4} />
-                                                {d.spend > 0 && labels.map(lbl => (
-                                                    <g key={lbl.id}>
-                                                        <rect x={x - 20} y={lbl.y - 30} width={40} height={18} rx={9} fill="white" stroke={lbl.color} strokeWidth="1.2" />
-                                                        <text x={x} y={lbl.y - 18} textAnchor="middle" fill={lbl.color} fontSize="9" fontWeight="900" filter="url(#halo)">{lbl.val}</text>
-                                                    </g>
-                                                ))}
-                                                <circle cx={x} cy={getY(d.payback, maxPb)} r="5" fill="#f59e0b" stroke="white" strokeWidth="2" />
-                                                <text x={x} y={pY + cH + 30} textAnchor="middle" fill="#94a3b8" fontSize="10" fontWeight="bold" transform={`rotate(-35, ${x}, ${pY + cH + 30})`}>{d.month}</text>
-                                            </g>
-                                        );
-                                    })}
-                                </svg>
-                            </div>
+                                    return (
+                                        <g key={i}>
+                                            <rect x={x - 15} y={pY + cH - mncH} width={30} height={mncH} fill="#6366f1" fillOpacity={d.spend > 0 ? 0.8 : 0.1} rx={4} />
+                                            {d.spend > 0 && labels.map(lbl => (
+                                                <g key={lbl.id}>
+                                                    <rect x={x - 20} y={lbl.y - 30} width={40} height={18} rx={9} fill="white" stroke={lbl.color} strokeWidth="1.2" />
+                                                    <text x={x} y={lbl.y - 18} textAnchor="middle" fill={lbl.color} fontSize="9" fontWeight="900" filter="url(#halo)">{lbl.val}</text>
+                                                </g>
+                                            ))}
+                                            <circle cx={x} cy={getY(d.payback, maxPb)} r="5" fill="#f59e0b" stroke="white" strokeWidth="2" />
+                                            <text x={x} y={pY + cH + 30} textAnchor="middle" fill="#94a3b8" fontSize="10" fontWeight="bold" transform={`rotate(-35, ${x}, ${pY + cH + 30})`}>{d.month}</text>
+                                        </g>
+                                    );
+                                })}
+                            </svg>
                         </div>
 
-                        {/* 2. TABLE UNIT: Keep matrix together */}
-                        <div className="matrix-container bg-white border border-slate-100 rounded-[2rem] overflow-hidden shadow-sm">
+                        {/* TABLE */}
+                        <div className="bg-white border border-slate-100 rounded-[2rem] overflow-hidden shadow-sm">
                             <table className="w-full text-center text-xs border-collapse">
                                 <thead className="bg-slate-50 border-b text-slate-400 font-black uppercase tracking-widest">
                                     <tr>
@@ -285,23 +274,25 @@
                             </table>
                         </div>
 
-                        {/* 3. NARRATIVE UNIT: Keep analysis/roadmap together */}
-                        <div className="narrative-container flex flex-col space-y-10 pt-8 border-t border-slate-100">
-                            <div className="space-y-4">
-                                <div className="flex items-center gap-2 text-[#1a3812]">
-                                   <Icons.Message size={22} />
-                                   <h4 className="font-black text-[13px] uppercase tracking-widest">Strategic Narrative</h4>
+                        {/* NARRATIVES: Only show on the "Overall" summary dashboard for that region */}
+                        {isOverall && (
+                            <div className="flex flex-col space-y-10 pt-8 border-t border-slate-100">
+                                <div className="space-y-4">
+                                    <div className="flex items-center gap-2 text-[#1a3812]">
+                                       <Icons.Message size={22} />
+                                       <h4 className="font-black text-[13px] uppercase tracking-widest">Strategic Narrative</h4>
+                                    </div>
+                                    <AutoExpandingTextarea value={commentary || ''} onChange={(e) => onNarrativeChange(title, e.target.value)} className="p-8 bg-slate-50 rounded-[2rem] border border-slate-100 text-slate-800 text-[15px] italic font-medium leading-relaxed shadow-inner" />
                                 </div>
-                                <AutoExpandingTextarea value={commentary || ''} onChange={(e) => onNarrativeChange(title, e.target.value)} className="p-8 bg-slate-50 rounded-[2rem] border border-slate-100 text-slate-800 text-[15px] italic font-medium leading-relaxed shadow-inner" />
-                            </div>
-                            <div className="space-y-4">
-                                <div className="flex items-center gap-2 text-indigo-900">
-                                    <Icons.Map size={22} />
-                                    <h4 className="font-black text-[13px] uppercase tracking-widest">Next month's plans</h4>
+                                <div className="space-y-4">
+                                    <div className="flex items-center gap-2 text-indigo-900">
+                                        <Icons.Map size={22} />
+                                        <h4 className="font-black text-[13px] uppercase tracking-widest">Next month's plans</h4>
+                                    </div>
+                                    <AutoExpandingTextarea value={roadmap || ''} onChange={(e) => onRoadmapSync(title, e.target.value)} className="p-8 bg-indigo-50/20 rounded-[2rem] border border-indigo-100/50 text-slate-800 text-[15px] font-medium leading-relaxed shadow-inner" placeholder="Enter upcoming tactical optimizations..." />
                                 </div>
-                                <AutoExpandingTextarea value={roadmap || ''} onChange={(e) => onRoadmapSync(title, e.target.value)} className="p-8 bg-indigo-50/20 rounded-[2rem] border border-indigo-100/50 text-slate-800 text-[15px] font-medium leading-relaxed shadow-inner" placeholder="Enter upcoming tactical optimizations..." />
                             </div>
-                        </div>
+                        )}
                     </div>
                 </div>
             );
@@ -416,9 +407,9 @@
                 const topContributor = dash.contributionList[0];
                 const monthName = getMonthName(selectedMonth);
 
-                if (p === 'Overall') {
-                    const gacAgg = aggregate(data.filter(r => (region === 'GLOBAL' || r.region?.toUpperCase() === region) && r.date === selectedMonth && r.platform === 'Google AC'));
-                    const ttdAgg = aggregate(data.filter(r => (region === 'GLOBAL' || r.region?.toUpperCase() === region) && r.date === selectedMonth && r.platform === 'TTD'));
+                if (region === 'GLOBAL') {
+                    const gacAgg = aggregate(data.filter(r => r.date === selectedMonth && r.platform === 'Google AC'));
+                    const ttdAgg = aggregate(data.filter(r => r.date === selectedMonth && r.platform === 'TTD'));
                     const topEfficiency = [...dash.contributionList].filter(i=>i.spend>0).sort((a,b) => a.payback - b.payback)[0];
 
                     return `Overall:
@@ -426,31 +417,49 @@ In ${monthName}, we drove ${cur.mncs.toLocaleString()} MNCs (${growth >= 0 ? '+'
 The majority of MNCs came from: ${topContributor?.label} (${topContributor?.mncs.toLocaleString()}). ${topEfficiency?.label || "N/A"} led in efficiency with a ${topEfficiency?.payback.toFixed(1)}m payback. ${ttdAgg.mncs > gacAgg.mncs ? 'TTD' : 'GAC'} was the largest contributor to MNC volume (${ttdAgg.mncs.toLocaleString()} vs. ${gacAgg.mncs.toLocaleString()} from ${ttdAgg.mncs > gacAgg.mncs ? 'GAC' : 'TTD'}).
 
 Main Highlights / Performance Influencers: 
-• LATAM: Performance remained stable, maintaining spend levels. Volume was partially offset by a strong LTV improvement.
+• LATAM: Performance stable, partially offset by a strong LTV improvement.
 • NORTHAM: Tracked at strong efficiency, demonstrating robust market resilience.
-• EUROPE: Campaign optimizations were implemented to find adequate cost-per-incremental-signup setups.
-• ASIA: Significant growth led by specific market strategic adjustments to Purchase optimization.
-• PACIFIC: Achieving initial metrics with focus on efficiency optimization to track under the 15m goal.
-• GBR: Activity adjustments running to improve overall CPA and efficiency.`;
+• EUROPE: Optimizations implemented to improve cost-per-incremental-signup.
+• ASIA: Significant growth led by adjustments to Purchase optimization.
+• PACIFIC: Achieving initial metrics with focus on efficiency optimization.
+• GBR: Activity adjustments running to improve overall CPA.`;
                 }
 
-                return `Platform/Vendor:
-In ${monthName}, ${p} drove ${cur.mncs.toLocaleString()} MNCs at a ${cur.payback.toFixed(1)}m payback.
-Top MNC contributors: ${dash.contributionList.slice(0, 3).map(c => c.label).join(' > ')}.
-Overall performance is ${cur.payback <= 15 ? 'efficient' : 'tracking above goal'}, ${cur.payback <= 15 ? 'tracking under' : 'currently exceeding'} the 15m goal. ${topContributor?.label} showed strong performance with a ${topContributor?.payback.toFixed(1)}m payback.`;
+                // Region-specific narrative
+                return `Strategic Narrative for ${region}:
+In ${monthName}, ${region} generated ${cur.mncs.toLocaleString()} total MNCs (${growth >= 0 ? '+' : ''}${growth}% MoM) at a weighted payback of ${cur.payback.toFixed(1)}m. ${topContributor?.label} stands as the primary growth driver for the region. Strategic focus remains on optimizing efficiency within high-velocity market segments and scaling BAU activity where payback tracking remains under the 15m goal.`;
             };
 
             const getRoadmap = (region, p) => {
                 const key = `${region}_${selectedMonth}_${p}`;
                 if (roadmaps[key]) return roadmaps[key];
-                return `Major Plans for Next Month
+                
+                if (region === 'GLOBAL') {
+                    return `Major Plans for Next Month
 
-LATAM: Maintain performance while conducting incrementality tests to build certainty for GAC activity.
+LATAM: Maintain performance while conducting incrementality tests.
 NORTHAM: USA conversion lift test and Creative Engine test.
-EUROPE: Increase BAU spend for 4 non-MMM countries (Spain, Netherlands, Hungary, Finland).
-ASIA: Test English Purchase Campaign in BAU activity to improve campaign CVR, and monitor/optimise iOS testing in Japan.
-PACIFIC: Continue running the GAC iOS test in AUS and implement tracked calibrated registrations in AUS.
-GBR: Switch back to registration optimised activity, as in-platform incrementality test showed poorer results with purchase.`;
+EUROPE: Increase BAU spend for core non-MMM countries.
+ASIA: Test English Purchase Campaign in BAU activity.
+PACIFIC: Continue running GAC iOS testing in AUS.
+GBR: Switch back to registration optimised activity.`;
+                }
+
+                // Region-specific roadmap
+                const plans = {
+                    'LATAM': 'Maintain performance while conducting incrementality tests to build certainty for GAC activity.',
+                    'NORTHAM': 'USA conversion lift test and Creative Engine test.',
+                    'EUROPE': 'Increase BAU spend for 4 non-MMM countries (Spain, Netherlands, Hungary, Finland).',
+                    'ASIA': 'Test English Purchase Campaign in BAU activity and monitor/optimise iOS testing in Japan.',
+                    'PACIFIC': 'Continue running the GAC iOS test in AUS and implement tracked calibrated registrations.',
+                    'GBR': 'Switch back to registration optimised activity to improve incrementality results.',
+                    'MEA': 'Monitor efficiency and explore BAU scaling opportunities in high-potential markets.'
+                };
+
+                return `Major Plans for ${region} next month:
+• ${plans[region] || 'Maintain regional performance while optimizing cost-per-acquisition and payback efficiency across BAU campaigns.'}
+• Review and optimize creative assets for core high-velocity market segments.
+• Conduct strategic testing to improve incremental performance results.`;
             };
 
             const formatAccurateCurrency = (v) => {
