@@ -88,8 +88,8 @@
                 if (raw.includes('month') || raw.includes('date')) return 'date';
                 if (raw.includes('country')) return 'country';
                 if (raw.includes('region')) return 'region';
-                if (raw.includes('platform') || raw.includes('source')) return 'platform';
-                if (raw.includes('mncs') || raw.includes('conv')) return 'mncs';
+                if (raw.includes('platform') || raw.includes('source') || raw.includes('vendor')) return 'platform';
+                if (raw.includes('mncs') || raw.includes('deposits') || raw.includes('conv')) return 'mncs';
                 if (raw.includes('ltv')) return 'ltv';
                 if (raw.includes('payback')) return 'payback';
                 if (raw.includes('spend') || raw.includes('cost')) return 'spend';
@@ -199,6 +199,8 @@
                                         <th className="py-5 px-8 text-left">{isGlobal ? 'Region' : 'Market'}</th>
                                         <th className="py-5 px-4 text-right">Investment</th>
                                         <th className="py-5 px-4 text-right">MNCs</th>
+                                        <th className="py-5 px-4">MoM%</th>
+                                        <th className="py-5 px-4">YoY%</th>
                                         <th className="py-5 px-4 text-[#ef4444]">CPA</th>
                                         <th className="py-5 px-4 text-[#10b981]">LTV</th>
                                         <th className="py-5 px-4 text-right pr-10">PB</th>
@@ -210,6 +212,8 @@
                                             <td className="py-4 px-8 text-left uppercase text-slate-900 font-black">{item.label}</td>
                                             <td className="py-4 px-4 text-right text-slate-500">{formatCurrency(item.spend)}</td>
                                             <td className="py-4 px-4 text-right text-slate-900 font-black">{formatNumber(item.mncs)}</td>
+                                            <td className="py-4 px-4"><ChangeBadge val={item.momChange} /></td>
+                                            <td className="py-4 px-4"><ChangeBadge val={item.yoyChange} /></td>
                                             <td className="py-4 px-4 text-[#ef4444] font-black">{formatCPA(item.cpa)}</td>
                                             <td className="py-4 px-4 text-[#10b981]">£{Math.round(item.ltv)}</td>
                                             <td className="py-4 px-4 text-right pr-10 text-slate-900 font-black">{item.payback.toFixed(1)}m</td>
@@ -276,6 +280,10 @@
             const dashboardData = useMemo(() => {
                 if (!data.length || !selectedMonth) return {};
                 const res = {};
+                const [y, m] = selectedMonth.split('-').map(Number);
+                const pmS = `${m === 1 ? y-1 : y}-${String(m === 1 ? 12 : m-1).padStart(2, '0')}`;
+                const pyS = `${y-1}-${String(m).padStart(2, '0')}`;
+
                 platforms.forEach(p => {
                     const allDates = [...new Set(data.map(d => d.date))].sort();
                     const trend = allDates.map(date => {
@@ -286,7 +294,10 @@
                     const labels = [...new Set(current.map(r => selectedRegion === 'GLOBAL' ? r.region : r.country))];
                     const contributionList = labels.map(label => {
                         const f = (r) => (selectedRegion === 'GLOBAL' ? r.region : r.country) === label && r.platform === p;
-                        return { label, ...aggregate(data.filter(r => f(r) && r.date === selectedMonth)) };
+                        const cur = aggregate(data.filter(r => f(r) && r.date === selectedMonth));
+                        const pm = aggregate(data.filter(r => f(r) && r.date === pmS));
+                        const py = aggregate(data.filter(r => f(r) && r.date === pyS));
+                        return { label, ...cur, momChange: pm.mncs ? (cur.mncs-pm.mncs)/pm.mncs : 0, yoyChange: py.mncs ? (cur.mncs-py.mncs)/py.mncs : 0 };
                     }).sort((a,b) => b.spend - a.spend);
                     res[p] = { trend, contributionList };
                 });
@@ -309,7 +320,11 @@
                 if (!dash || !dash.trend.length) return "";
                 const cur = dash.trend.find(t => t.month === selectedMonth);
                 if (!cur || cur.mncs === 0) return "";
-                return `For ${selectedMonth}, ${p} performance in ${selectedRegion} reached ${cur.mncs.toLocaleString()} MNCs at a weighted payback of ${cur.payback.toFixed(1)}m. ${dash.contributionList[0]?.label || "N/A"} stands as the primary growth driver for this period.`;
+                const [y, m] = selectedMonth.split('-').map(Number);
+                const pmS = `${m === 1 ? y-1 : y}-${String(m === 1 ? 12 : m-1).padStart(2, '0')}`;
+                const prevM = dash.trend.find(t => t.month === pmS);
+                const growth = prevM && prevM.mncs > 0 ? ((cur.mncs-prevM.mncs)/prevM.mncs*100).toFixed(0) : 0;
+                return `For ${selectedMonth}, ${p} performance in ${selectedRegion} reached ${cur.mncs.toLocaleString()} MNCs (${growth >= 0 ? '+' : ''}${growth}% MoM) at a weighted payback of ${cur.payback.toFixed(1)}m. ${dash.contributionList[0]?.label || "N/A"} stands as the primary growth driver for this period.`;
             };
 
             return (
@@ -346,7 +361,7 @@
                             <div className="space-y-16 animate-in">
                                 <header className="border-l-[12px] border-green-600 pl-12 py-6 mb-20">
                                     <h2 className="text-8xl font-black text-slate-900 tracking-tighter uppercase leading-none">{selectedRegion} <span className="text-green-600 block">{selectedMonth}</span></h2>
-                                    <p className="text-slate-400 font-black uppercase tracking-[0.6em] mt-12 text-[11px]">Performance Dossier</p>
+                                    <p className="text-slate-400 font-black uppercase tracking-[0.6em] mt-12 text-[11px]">Performance Intelligence Dossier</p>
                                 </header>
                                 <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
                                     {[
