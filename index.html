@@ -438,6 +438,58 @@
                 return { spend: s, mncs: m, regs: r, cpa: m > 0 ? s / m : 0, payback: m > 0 ? pWSum / m : 0, ltv: m > 0 ? lSum / m : 0, cvr: r > 0 ? m / r : 0 };
             };
 
+            // Independent data fetcher for sync logic
+            const getRegionStatsRaw = (region, month) => {
+                const filtered = data.filter(r => r.region?.toUpperCase() === region && r.date === month);
+                return aggregate(filtered);
+            };
+
+            const getNarrativeFallback = (region, month) => {
+                const stats = getRegionStatsRaw(region, month);
+                if (stats.mncs === 0) return "";
+                return `In ${getMonthName(month)}, ${region} reached ${stats.mncs.toLocaleString()} MNCs at a weighted payback of ${stats.payback.toFixed(1)}m. Performance remains steady.`;
+            };
+
+            const getRoadmapFallback = (region) => {
+                return `Maintain regional performance in ${region} and optimize cost-per-acquisition.`;
+            };
+
+            const handleIntelligenceSync = async (type) => {
+                setIsSyncing(true);
+                try {
+                    const regionalInputs = REGIONS.map(r => {
+                        const nKey = `${r}_${selectedMonth}_Overall`;
+                        const pKey = `${r}_${selectedMonth}_Overall`;
+                        const narrative = comments[nKey] || getNarrativeFallback(r, selectedMonth);
+                        const roadmap = roadmaps[pKey] || getRoadmapFallback(r);
+                        if (!narrative && !roadmap) return null;
+                        return `--- REGION: ${r} ---\nNARRATIVE: ${narrative}\nPLANS: ${roadmap}`;
+                    }).filter(Boolean).join('\n\n');
+
+                    if (!regionalInputs) {
+                        setIsSyncing(false);
+                        return;
+                    }
+
+                    const systemPrompt = "Analyze regional inputs and synthesize them into a Global dossier. Format: 'Main Highlights / Performance Influencers:' followed by bullets for each region, then 'Major Plans for Next Month' followed by regional summaries. Highlight CVR shifts and specific test results.";
+                    const result = await callGemini(regionalInputs, systemPrompt);
+                    
+                    const sections = result.split(/Major Plans for Next Month/i);
+                    const narrativeRes = sections[0].trim();
+                    const roadmapRes = `Major Plans for Next Month\n\n${sections[1]?.trim() || ""}`;
+
+                    if (type === 'comments') {
+                        setComments(prev => ({...prev, [`GLOBAL_${selectedMonth}_Overall`]: narrativeRes}));
+                    } else {
+                        setRoadmaps(prev => ({...prev, [`GLOBAL_${selectedMonth}_Overall`]: roadmapRes}));
+                    }
+                } catch (err) { 
+                    console.error("Sync Error:", err); 
+                } finally { 
+                    setIsSyncing(false); 
+                }
+            };
+
             const getRegionData = (region, month) => {
                 if (!month) return null;
                 const [y, mNum] = month.split('-').map(Number);
@@ -489,31 +541,6 @@
                 return regionsToProcess.map(r => getRegionData(r, selectedMonth)).filter(Boolean);
             }, [data, selectedRegion, selectedMonth]);
 
-            const handleIntelligenceSync = async () => {
-                setIsSyncing(true);
-                try {
-                    const regionalInputs = REGIONS.map(r => {
-                        const nKey = `${r}_${selectedMonth}_Overall`;
-                        const pKey = `${r}_${selectedMonth}_Overall`;
-                        const narrative = comments[nKey];
-                        const roadmap = roadmaps[pKey];
-                        if (!narrative && !roadmap) return null;
-                        return `--- REGION: ${r} ---\nNARRATIVE: ${narrative || "Standard regional performance."}\nPLANS: ${roadmap || "Continue BAU."}`;
-                    }).filter(Boolean).join('\n\n');
-
-                    if (!regionalInputs) {
-                        setIsSyncing(false);
-                        return;
-                    }
-
-                    const systemPrompt = "Analyze regional inputs and synthesize them into a Global dossier. Format: 'Main Highlights / Performance Influencers:' followed by bullets for each region, then 'Major Plans for Next Month' followed by regional summaries. Highlight CVR shifts and specific test results.";
-                    const result = await callGemini(regionalInputs, systemPrompt);
-                    const sections = result.split('Major Plans for Next Month');
-                    setComments(prev => ({...prev, [`GLOBAL_${selectedMonth}_Overall`]: sections[0].trim()}));
-                    setRoadmaps(prev => ({...prev, [`GLOBAL_${selectedMonth}_Overall`]: `Major Plans for Next Month\n\n${sections[1]?.trim() || ""}`}));
-                } catch (err) { console.error(err); } finally { setIsSyncing(false); }
-            };
-
             return (
                 <div className="min-h-screen bg-[#f8fafc] pb-32">
                     <nav className="w-full bg-[#1a3812] p-8 flex items-center justify-between no-print shadow-2xl border-b-[8px] border-green-900/20">
@@ -521,7 +548,27 @@
                         <div className="flex gap-4">{!data.length ? (<label className="px-10 py-4 bg-green-600 text-white rounded-2xl font-black uppercase text-xs cursor-pointer hover:bg-green-50 shadow-lg transition-all"><Icons.Upload size={20} className="mr-3 inline" /> Connect Data<input type="file" accept=".csv" className="hidden" onChange={handleFileUpload} /></label>) : (<div className="flex gap-4"><div className="flex bg-white/10 p-1 rounded-2xl border border-white/10"><select value={selectedMonth} onChange={e => setSelectedMonth(e.target.value)} className="bg-transparent text-white font-bold px-4 py-2 outline-none text-xs">{[...new Set(data.map(d => d.date))].sort().reverse().map(d => <option key={d} value={d} className="text-black">{d}</option>)}</select><select value={selectedRegion} onChange={e => setSelectedRegion(e.target.value)} className="bg-transparent text-white font-bold px-4 py-2 outline-none text-xs border-l border-white/10"><option value="GLOBAL" className="text-black">GLOBAL (Full Report)</option>{REGIONS.map(r => <option key={r} value={r} className="text-black">{r}</option>)}</select></div><button onClick={() => window.print()} className="bg-white text-[#1a3812] px-8 py-4 rounded-2xl font-black text-xs uppercase shadow-lg hover:bg-green-50">Export PDF</button><button onClick={() => setData([])} className="bg-red-500/20 p-4 rounded-2xl text-red-100 hover:bg-red-600 transition-colors"><Icons.X size={20} /></button></div>)}</div>
                     </nav>
                     <div className="max-w-5xl mx-auto p-12">
-                        {fullReport.length > 0 ? (<div className="space-y-32">{fullReport.map((rData, rIdx) => (<div key={rData.region} className={`space-y-16 ${rIdx > 0 ? 'region-section' : ''} animate-in`}><header className="border-l-[12px] border-green-600 pl-12 py-6 mb-20"><h2 className="text-8xl font-black text-slate-900 tracking-tighter uppercase leading-none">{rData.region} <span className="text-green-600 block">{selectedMonth}</span></h2><p className="text-slate-400 font-black uppercase tracking-[0.6em] mt-12 text-[11px]">{rData.region === 'GLOBAL' ? 'Enterprise Synthesis Dossier' : `Performance Intelligence: ${rData.region}`}</p></header><div className="grid grid-cols-1 md:grid-cols-3 gap-8 kpi-grid">{[{ l: 'Total Investment', v: new Intl.NumberFormat('en-GB', { style: 'currency', currency: 'GBP', maximumFractionDigits: 0 }).format(rData.stats.cur.spend), ch: rData.stats.mom.spend, inv: false }, { l: 'Growth (MNCs)', v: new Intl.NumberFormat('en-US').format(rData.stats.cur.mncs), ch: rData.stats.mom.mncs, inv: false }, { l: 'Weighted Payback', v: `${rData.stats.cur.payback.toFixed(1)}m`, ch: rData.stats.mom.payback, inv: true }].map((k, i) => (<div key={i} className="bg-white rounded-[3rem] p-12 border shadow-xl flex flex-col justify-between hover:scale-105 transition-transform"><div className="flex justify-between items-start mb-10"><span className="text-[11px] font-black text-slate-400 uppercase tracking-widest">{k.l}</span><ChangeBadge val={k.ch} inverse={k.inv} /></div><span className="text-5xl font-black text-slate-900 tracking-tighter leading-none">{k.v}</span></div>))}</div>{rData.dashboards.map(dash => (<PlatformDashboard key={dash.title} region={rData.region} month={selectedMonth} title={dash.title} dashboard={dash} isOverall={dash.title === 'Overall'} formatNumber={v => v.toLocaleString()} isGlobal={rData.region === 'GLOBAL'} onNarrativeChange={(p, t) => setComments(prev => ({ ...prev, [`${rData.region}_${selectedMonth}_${dash.title}`]: t }))} onRoadmapSync={(p, t) => setRoadmaps(prev => ({ ...prev, [`${rData.region}_${selectedMonth}_${dash.title}`]: t }))} onSyncFromRegions={handleIntelligenceSync} isSyncing={isSyncing} commentary={comments[`${rData.region}_${selectedMonth}_${dash.title}`]} roadmap={roadmaps[`${rData.region}_${selectedMonth}_${dash.title}`]} />))}</div>))}</div>) : (
+                        {fullReport.length > 0 ? (<div className="space-y-32">{fullReport.map((rData, rIdx) => (<div key={rData.region} className={`space-y-16 ${rIdx > 0 ? 'region-section' : ''} animate-in`}><header className="border-l-[12px] border-green-600 pl-12 py-6 mb-20"><h2 className="text-8xl font-black text-slate-900 tracking-tighter uppercase leading-none">{rData.region} <span className="text-green-600 block">{selectedMonth}</span></h2><p className="text-slate-400 font-black uppercase tracking-[0.6em] mt-12 text-[11px]">{rData.region === 'GLOBAL' ? 'Enterprise Synthesis Dossier' : `Performance Intelligence: ${rData.region}`}</p></header><div className="grid grid-cols-1 md:grid-cols-3 gap-8 kpi-grid">{[{ l: 'Total Investment', v: new Intl.NumberFormat('en-GB', { style: 'currency', currency: 'GBP', maximumFractionDigits: 0 }).format(rData.stats.cur.spend), ch: rData.stats.mom.spend, inv: false }, { l: 'Growth (MNCs)', v: new Intl.NumberFormat('en-US').format(rData.stats.cur.mncs), ch: rData.stats.mom.mncs, inv: false }, { l: 'Weighted Payback', v: `${rData.stats.cur.payback.toFixed(1)}m`, ch: rData.stats.mom.payback, inv: true }].map((k, i) => (<div key={i} className="bg-white rounded-[3rem] p-12 border shadow-xl flex flex-col justify-between hover:scale-105 transition-transform"><div className="flex justify-between items-start mb-10"><span className="text-[11px] font-black text-slate-400 uppercase tracking-widest">{k.l}</span><ChangeBadge val={k.ch} inverse={k.inv} /></div><span className="text-5xl font-black text-slate-900 tracking-tighter leading-none">{k.v}</span></div>))}</div>{rData.dashboards.map(dash => {
+                                const key = `${rData.region}_${selectedMonth}_${dash.title}`;
+                                return (
+                                    <PlatformDashboard 
+                                        key={dash.title} 
+                                        region={rData.region} 
+                                        month={selectedMonth} 
+                                        title={dash.title} 
+                                        dashboard={dash} 
+                                        isOverall={dash.title === 'Overall'} 
+                                        formatNumber={v => v.toLocaleString()} 
+                                        isGlobal={rData.region === 'GLOBAL'} 
+                                        onNarrativeChange={(p, t) => setComments(prev => ({ ...prev, [key]: t }))} 
+                                        onRoadmapSync={(p, t) => setRoadmaps(prev => ({ ...prev, [key]: t }))} 
+                                        onSyncFromRegions={handleIntelligenceSync} 
+                                        isSyncing={isSyncing} 
+                                        commentary={comments[key] || (dash.title === 'Overall' && rData.region !== 'GLOBAL' ? getNarrativeFallback(rData.region, selectedMonth) : "")} 
+                                        roadmap={roadmaps[key] || (dash.title === 'Overall' && rData.region !== 'GLOBAL' ? getRoadmapFallback(rData.region) : "")} 
+                                    />
+                                );
+                            })}</div>))}</div>) : (
                             <div className="flex flex-col items-center justify-center min-h-[60vh] text-center bg-white p-24 rounded-[5rem] shadow-2xl border border-slate-100"><Icons.Chart size={100} className="text-green-600 mx-auto mb-10 transform -rotate-12" /><h3 className="text-6xl font-black text-slate-900 tracking-tighter mb-6 uppercase leading-none">Intelligence Hub</h3><p className="text-slate-400 font-bold mb-12 text-2xl">Connect your CSV source to begin automated synthesis.</p><label className="inline-flex items-center px-16 py-8 bg-[#1a3812] text-white rounded-[2.5rem] font-black uppercase cursor-pointer hover:scale-105 transition-all shadow-2xl"><Icons.Upload size={24} className="mr-4" /> Select Market Data<input type="file" accept=".csv" className="hidden" onChange={handleFileUpload} /></label></div>
                         )}
                     </div>
