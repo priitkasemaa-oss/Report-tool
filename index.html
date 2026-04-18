@@ -11,10 +11,12 @@
     <script src="https://cdn.tailwindcss.com"></script>
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;700;900&display=swap');
-        body { font-family: 'Inter', sans-serif; }
+        body { font-family: 'Inter', sans-serif; -webkit-print-color-adjust: exact; }
         @media print { .no-print { display: none !important; } body { background: white !important; } .max-w-5xl { max-width: 100% !important; padding: 0 !important; width: 100% !important; } }
         .animate-in { animation: fadeIn 0.8s ease-out; }
         @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+        /* Hide scrollbars for the auto-expanding textareas */
+        textarea::-webkit-scrollbar { width: 0px; background: transparent; }
     </style>
 </head>
 <body class="bg-[#f8fafc]">
@@ -37,7 +39,8 @@
             ChevronRight: (p) => <Icon d="m9 18 6-6-6-6" {...p} />,
             X: (p) => <Icon d="M18 6 6 18M6 6l12 12" {...p} />,
             Message: (p) => <Icon d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" {...p} />,
-            Map: (p) => <Icon d="M3 6l6-3 6 3 6-3v15l-6 3-6-3-6 3V6zm6-3v15m6-15v15" {...p} />
+            Map: (p) => <Icon d="M3 6l6-3 6 3 6-3v15l-6 3-6-3-6 3V6zm6-3v15m6-15v15" {...p} />,
+            Sparkles: (p) => <Icon d="m12 3 1.912 5.813a2 2 0 0 0 1.275 1.275L21 12l-5.813 1.912a2 2 0 0 0-1.275 1.275L12 21l-1.912-5.813a2 2 0 0 0-1.275-1.275L3 12l5.813-1.912a2 2 0 0 0 1.275-1.275L12 3Z" {...p} />
         };
 
         // --- COMPONENTS ---
@@ -78,6 +81,13 @@
             return isNaN(num) ? 0 : num;
         };
 
+        const monthNames = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
+        const getMonthName = (dateStr) => {
+            if (!dateStr) return "";
+            const m = parseInt(dateStr.split('-')[1]);
+            return monthNames[m-1] || "";
+        };
+
         function parseCSV(text) {
             text = text.replace(/^\uFEFF/, '');
             const lines = text.split(/\r?\n/).filter(l => l.trim());
@@ -116,10 +126,10 @@
             });
         }
 
-        const REGIONS = ['GLOBAL', 'NORTHAM', 'LATAM', 'ASIA', 'PACIFIC', 'GBR', 'EUROPE', 'ROW', 'MEA'];
+        const REGIONS = ['NORTHAM', 'LATAM', 'ASIA', 'PACIFIC', 'GBR', 'EUROPE', 'ROW', 'MEA'];
 
-        // --- DASHBOARD ---
-        const PlatformDashboard = ({ title, dashboard, formatCurrency, formatCPA, formatNumber, isGlobal, onNarrativeChange, onRoadmapSync, commentary, roadmap }) => {
+        // --- DASHBOARD COMPONENT ---
+        const PlatformDashboard = ({ title, dashboard, formatCurrency, formatCPA, formatNumber, isGlobal, onNarrativeChange, onRoadmapSync, commentary, roadmap, isOverall = false }) => {
             if (!dashboard || dashboard.trend.length === 0) return null;
             const { trend, contributionList } = dashboard;
             
@@ -134,14 +144,14 @@
             const step = trend.length > 1 ? cW / (trend.length - 1) : 0;
             const getY = (val, max) => pY + cH - ((val / max) * cH);
             const getX = (i) => pL + i * step;
-
             const buildPath = (pts) => pts.map((p, i) => `${i === 0 ? 'M' : 'L'} ${p.x} ${p.y}`).join(' ');
 
             return (
-                <div className="bg-white rounded-[2.5rem] shadow-2xl border border-slate-100 flex flex-col mb-24 overflow-visible page-break-inside-avoid">
-                    <div className="bg-[#1a3812] px-10 py-6 border-b border-slate-200 flex justify-between items-center rounded-t-[2.5rem]">
+                <div className={`bg-white rounded-[2.5rem] shadow-2xl border border-slate-100 flex flex-col mb-24 overflow-visible page-break-inside-avoid ${isOverall ? 'border-indigo-100 ring-4 ring-indigo-50/50' : ''}`}>
+                    <div className={`${isOverall ? 'bg-indigo-900' : 'bg-[#1a3812]'} px-10 py-6 border-b border-slate-200 flex justify-between items-center rounded-t-[2.5rem]`}>
                         <h3 className="text-2xl font-black text-white uppercase tracking-tighter flex items-center">
-                            <Icons.ChevronRight size={24} className="mr-2 text-green-400" /> {title}
+                            {isOverall ? <Icons.Sparkles size={24} className="mr-2 text-indigo-400" /> : <Icons.ChevronRight size={24} className="mr-2 text-green-400" />}
+                            {title}
                         </h3>
                         <span className="text-[10px] text-white/40 font-black uppercase tracking-[0.4em]">{isGlobal ? 'Regional Synthesis' : 'Market Analysis'}</span>
                     </div>
@@ -176,7 +186,7 @@
 
                                     return (
                                         <g key={i}>
-                                            <rect x={x - 15} y={pY + cH - mncH} width={30} height={mncH} fill="#6366f1" fillOpacity={d.spend > 0 ? 0.8 : 0.2} rx={4} />
+                                            <rect x={x - 15} y={pY + cH - mncH} width={30} height={mncH} fill={isOverall ? "#6366f1" : "#6366f1"} fillOpacity={d.spend > 0 ? 0.8 : 0.1} rx={4} />
                                             {d.spend > 0 && labels.map(lbl => (
                                                 <g key={lbl.id}>
                                                     <rect x={x - 20} y={lbl.y - 30} width={40} height={18} rx={9} fill="white" stroke={lbl.color} strokeWidth="1.2" />
@@ -252,7 +262,7 @@
             const [selectedMonth, setSelectedMonth] = useState('');
             const [comments, setComments] = useState({});
             const [roadmaps, setRoadmaps] = useState({});
-            const platforms = ['Google AC', 'TTD', 'Moloco'];
+            const platforms = ['Overall', 'Google AC', 'TTD', 'Moloco'];
 
             const handleFileUpload = (e) => {
                 const file = e.target.files[0];
@@ -287,13 +297,13 @@
                 platforms.forEach(p => {
                     const allDates = [...new Set(data.map(d => d.date))].sort();
                     const trend = allDates.map(date => {
-                        const match = data.filter(r => (selectedRegion === 'GLOBAL' || r.region?.toUpperCase() === selectedRegion) && r.date === date && r.platform === p);
+                        const match = data.filter(r => (selectedRegion === 'GLOBAL' || r.region?.toUpperCase() === selectedRegion) && r.date === date && (p === 'Overall' || r.platform === p));
                         return { month: date, ...aggregate(match) };
                     });
-                    const current = data.filter(r => (selectedRegion === 'GLOBAL' || r.region?.toUpperCase() === selectedRegion) && r.date === selectedMonth && r.platform === p);
+                    const current = data.filter(r => (selectedRegion === 'GLOBAL' || r.region?.toUpperCase() === selectedRegion) && r.date === selectedMonth && (p === 'Overall' || r.platform === p));
                     const labels = [...new Set(current.map(r => selectedRegion === 'GLOBAL' ? r.region : r.country))];
                     const contributionList = labels.map(label => {
-                        const f = (r) => (selectedRegion === 'GLOBAL' ? r.region : r.country) === label && r.platform === p;
+                        const f = (r) => (selectedRegion === 'GLOBAL' ? r.region : r.country) === label && (p === 'Overall' || r.platform === p);
                         const cur = aggregate(data.filter(r => f(r) && r.date === selectedMonth));
                         const pm = aggregate(data.filter(r => f(r) && r.date === pmS));
                         const py = aggregate(data.filter(r => f(r) && r.date === pyS));
@@ -320,11 +330,52 @@
                 if (!dash || !dash.trend.length) return "";
                 const cur = dash.trend.find(t => t.month === selectedMonth);
                 if (!cur || cur.mncs === 0) return "";
+                
                 const [y, m] = selectedMonth.split('-').map(Number);
                 const pmS = `${m === 1 ? y-1 : y}-${String(m === 1 ? 12 : m-1).padStart(2, '0')}`;
                 const prevM = dash.trend.find(t => t.month === pmS);
                 const growth = prevM && prevM.mncs > 0 ? ((cur.mncs-prevM.mncs)/prevM.mncs*100).toFixed(0) : 0;
-                return `For ${selectedMonth}, ${p} performance in ${selectedRegion} reached ${cur.mncs.toLocaleString()} MNCs (${growth >= 0 ? '+' : ''}${growth}% MoM) at a weighted payback of ${cur.payback.toFixed(1)}m. ${dash.contributionList[0]?.label || "N/A"} stands as the primary growth driver for this period.`;
+                const pbGrowth = prevM && prevM.payback > 0 ? ((cur.payback-prevM.payback)/prevM.payback*100).toFixed(0) : 0;
+                const topRegion = dash.contributionList[0];
+                const monthName = getMonthName(selectedMonth);
+
+                if (p === 'Overall') {
+                    const gacMatch = data.filter(r => (selectedRegion === 'GLOBAL' || r.region?.toUpperCase() === selectedRegion) && r.date === selectedMonth && r.platform === 'Google AC');
+                    const ttdMatch = data.filter(r => (selectedRegion === 'GLOBAL' || r.region?.toUpperCase() === selectedRegion) && r.date === selectedMonth && r.platform === 'TTD');
+                    const gacAgg = aggregate(gacMatch);
+                    const ttdAgg = aggregate(ttdMatch);
+                    const topEfficiency = [...dash.contributionList].sort((a,b) => a.payback - b.payback)[0];
+
+                    return `Overall:
+In ${monthName}, we drove ${cur.mncs.toLocaleString()} MNCs (${growth >= 0 ? '+' : ''}${growth}% MoM) on £${cur.spend.toLocaleString()} spend, resulting in a payback of ${cur.payback.toFixed(1)}m (${pbGrowth >= 0 ? '+' : ''}${pbGrowth}% MoM). 
+The majority of MNCs came from: ${topRegion.label} (${topRegion.mncs.toLocaleString()}). ${topEfficiency?.label || "N/A"} led in efficiency with a ${topEfficiency?.payback.toFixed(1)}m payback. ${ttdAgg.mncs > gacAgg.mncs ? 'TTD' : 'GAC'} was the largest contributor to MNC volume (${ttdAgg.mncs.toLocaleString()} vs. ${gacAgg.mncs.toLocaleString()} from ${ttdAgg.mncs > gacAgg.mncs ? 'GAC' : 'TTD'}).
+
+Main Highlights / Performance Influencers: 
+• LATAM: Performance remained stable, maintaining spend levels. Volume was partially offset by a strong LTV improvement.
+• NORTHAM: Tracked at strong efficiency, demonstrating robust market resilience.
+• EUROPE: Campaign optimizations were implemented to find adequate cost-per-incremental-signup setups.
+• ASIA: Significant growth led by specific market strategic adjustments to Purchase optimization.
+• PACIFIC: Achieving initial metrics with focus on efficiency optimization to track under the 15m goal.
+• GBR: Activity adjustments running to improve overall CPA and efficiency.`;
+                }
+
+                return `Platform/Vendor:
+In ${monthName}, ${p} drove ${cur.mncs.toLocaleString()} MNCs at a ${cur.payback.toFixed(1)}m payback.
+Top MNC contributors: ${dash.contributionList.slice(0, 3).map(c => c.label).join(' > ')}.
+Overall performance was ${cur.payback <= 15 ? 'efficient' : 'tracking above goal'}, ${cur.payback <= 15 ? 'tracking under' : 'currently exceeding'} the 15m goal. ${topRegion.label} showed strong performance with a ${topRegion.payback.toFixed(1)}m payback.`;
+            };
+
+            const getRoadmap = (p) => {
+                const key = `${selectedRegion}_${selectedMonth}_${p}`;
+                if (roadmaps[key]) return roadmaps[key];
+                return `Major Plans for Next Month
+
+LATAM: Maintain performance while conducting incrementality tests to build certainty for activity.
+NORTHAM: Conversion lift test and Creative Engine optimizations.
+EUROPE: Increase BAU spend for core non-MMM countries.
+ASIA: Test English Purchase Campaign in BAU activity to improve campaign CVR.
+PACIFIC: Continue running iOS testing and implement tracked calibrated registrations.
+GBR: Switch back to registration optimised activity to improve incrementality results.`;
             };
 
             return (
@@ -332,7 +383,7 @@
                     <nav className="w-full bg-[#1a3812] p-8 flex items-center justify-between no-print shadow-2xl border-b-[8px] border-green-900/20">
                         <div className="flex items-center space-x-4">
                             <div className="bg-white/10 p-2 rounded-xl"><Icons.Chart size={28} className="text-green-400" /></div>
-                            <h1 className="text-2xl font-black text-white uppercase italic tracking-tighter">Monthly report tool</h1>
+                            <h1 className="text-2xl font-black text-white uppercase italic tracking-tighter leading-none">Monthly report tool</h1>
                         </div>
                         <div className="flex gap-4">
                             {!data.length ? (
@@ -347,10 +398,11 @@
                                             {[...new Set(data.map(d => d.date))].sort().reverse().map(d => <option key={d} value={d} className="text-black">{d}</option>)}
                                         </select>
                                         <select value={selectedRegion} onChange={e => setSelectedRegion(e.target.value)} className="bg-transparent text-white font-bold px-4 py-2 text-xs border-l border-white/10">
+                                            <option value="GLOBAL" className="text-black">GLOBAL</option>
                                             {REGIONS.map(r => <option key={r} value={r} className="text-black">{r}</option>)}
                                         </select>
                                     </div>
-                                    <button onClick={() => window.print()} className="bg-white px-8 py-4 rounded-2xl font-black text-xs uppercase shadow-lg hover:bg-green-50">Export PDF</button>
+                                    <button onClick={() => window.print()} className="bg-white px-8 py-4 rounded-2xl font-black text-[#1a3812] text-xs uppercase shadow-lg hover:bg-green-50">Export PDF</button>
                                     <button onClick={() => setData([])} className="bg-red-500/20 p-4 rounded-2xl text-red-100"><Icons.X /></button>
                                 </div>
                             )}
@@ -374,19 +426,23 @@
                                                 <span className="text-[11px] font-black text-slate-400 uppercase tracking-widest">{k.l}</span>
                                                 <ChangeBadge val={k.ch} inverse={k.inv} />
                                             </div>
-                                            <span className="text-5xl font-black text-slate-900 tracking-tighter">{k.v}</span>
+                                            <span className="text-5xl font-black text-slate-900 tracking-tighter leading-none">{k.v}</span>
                                         </div>
                                     ))}
                                 </div>
                                 {platforms.map(p => (
-                                    <PlatformDashboard key={p} title={p} dashboard={dashboardData[p]} formatCurrency={v => `£${Math.round(v/1000)}k`} formatCPA={v => `£${v.toFixed(2)}`} formatNumber={v => v.toLocaleString()} isGlobal={selectedRegion === 'GLOBAL'} onNarrativeChange={(p, t) => setComments(prev => ({ ...prev, [`${selectedRegion}_${selectedMonth}_${p}`]: t }))} onRoadmapSync={(p, t) => setRoadmaps(prev => ({ ...prev, [`${selectedRegion}_${selectedMonth}_${p}`]: t }))} commentary={getNarrative(p)} roadmap={roadmaps[`${selectedRegion}_${selectedMonth}_${p}`]} />
+                                    <PlatformDashboard key={p} title={p} dashboard={dashboardData[p]} isOverall={p === 'Overall'} formatCurrency={v => `£${Math.round(v/1000)}k`} formatCPA={v => `£${v.toFixed(2)}`} formatNumber={v => v.toLocaleString()} isGlobal={selectedRegion === 'GLOBAL'} onNarrativeChange={(p, t) => setComments(prev => ({ ...prev, [`${selectedRegion}_${selectedMonth}_${p}`]: t }))} onRoadmapSync={(p, t) => setRoadmaps(prev => ({ ...prev, [`${selectedRegion}_${selectedMonth}_${p}`]: t }))} commentary={getNarrative(p)} roadmap={getRoadmap(p)} />
                                 ))}
                             </div>
                         ) : (
                             <div className="flex flex-col items-center justify-center min-h-[60vh] text-center bg-white p-24 rounded-[5rem] shadow-2xl border border-slate-100">
-                                <Icons.Chart size={100} className="text-green-600 mx-auto mb-10" />
+                                <Icons.Chart size={100} className="text-green-600 mx-auto mb-10 transform -rotate-12" />
                                 <h3 className="text-6xl font-black text-slate-900 tracking-tighter mb-6 uppercase">Intelligence Hub</h3>
                                 <p className="text-slate-400 font-bold mb-12 text-2xl">Connect your CSV source to begin automated synthesis.</p>
+                                <label className="inline-flex items-center px-16 py-8 bg-[#1a3812] text-white rounded-[2.5rem] font-black uppercase cursor-pointer hover:scale-105 transition-all shadow-2xl">
+                                    <Icons.Upload size={24} className="mr-4" /> Select Market Data
+                                    <input type="file" accept=".csv" className="hidden" onChange={handleFileUpload} />
+                                </label>
                             </div>
                         )}
                     </div>
