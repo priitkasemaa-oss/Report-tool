@@ -13,23 +13,31 @@
         @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;700;900&display=swap');
         body { font-family: 'Inter', sans-serif; -webkit-print-color-adjust: exact; }
         
-        /* Print-specific optimizations to avoid weird cuts */
+        /* Print-specific optimizations to avoid weird cuts and gaps */
         @media print {
             .no-print { display: none !important; }
             body { background: white !important; padding: 0 !important; margin: 0 !important; }
             .max-w-5xl { max-width: 100% !important; padding: 0 !important; width: 100% !important; margin: 0 !important; }
+            
+            /* Allow dashboards to split, but keep sub-sections together */
             .page-break-inside-avoid { 
                 page-break-inside: avoid !important; 
                 break-inside: avoid-page !important;
-                margin-bottom: 2rem !important;
+                margin-bottom: 1.5rem !important;
+                display: block !important;
             }
+            
+            /* Ensure table rows don't split mid-text */
             tr { 
                 page-break-inside: avoid !important; 
                 break-inside: avoid !important; 
             }
-            thead { display: table-header-group !important; } /* Repeats header if table splits */
-            .shadow-2xl, .shadow-xl, .shadow-sm { box-shadow: none !important; border: 1px solid #e2e8f0 !important; }
-            textarea { border: none !important; background: transparent !important; }
+            
+            thead { display: table-header-group !important; }
+            .shadow-2xl, .shadow-xl, .shadow-sm { box-shadow: none !important; border: 1px solid #f1f5f9 !important; }
+            
+            /* Force the first section to stay with the header if it fits */
+            header, .kpi-grid { break-after: avoid !important; }
         }
 
         .animate-in { animation: fadeIn 0.8s ease-out; }
@@ -166,7 +174,7 @@
             const buildPath = (pts) => pts.map((p, i) => `${i === 0 ? 'M' : 'L'} ${p.x} ${p.y}`).join(' ');
 
             return (
-                <div className={`bg-white rounded-[2.5rem] shadow-2xl border border-slate-100 flex flex-col mb-24 overflow-visible page-break-inside-avoid ${isOverall ? 'border-indigo-100 ring-4 ring-indigo-50/50' : ''}`}>
+                <div className={`bg-white rounded-[2.5rem] shadow-2xl border border-slate-100 flex flex-col mb-24 overflow-visible ${isOverall ? 'border-indigo-100 ring-4 ring-indigo-50/50' : ''}`}>
                     <div className={`${isOverall ? 'bg-indigo-900' : 'bg-[#1a3812]'} px-10 py-6 border-b border-slate-200 flex justify-between items-center rounded-t-[2.5rem]`}>
                         <h3 className="text-2xl font-black text-white uppercase tracking-tighter flex items-center">
                             {isOverall ? <Icons.Sparkles size={24} className="mr-2 text-indigo-400" /> : <Icons.ChevronRight size={24} className="mr-2 text-green-400" />}
@@ -176,7 +184,7 @@
                     </div>
                     
                     <div className="p-10 space-y-12">
-                        {/* GRAPH SECTION */}
+                        {/* GRAPH SECTION - Now has internal avoid rule to sit on Page 1 if possible */}
                         <div className="w-full bg-white overflow-visible border-b border-slate-50 pb-8 page-break-inside-avoid">
                             <svg viewBox={`0 0 ${svgWidth} ${svgHeight}`} className="w-full h-auto overflow-visible block">
                                 <defs>
@@ -220,7 +228,7 @@
                             </svg>
                         </div>
 
-                        {/* MATRIX TABLE */}
+                        {/* MATRIX TABLE - Cohesive unit */}
                         <div className="bg-white border border-slate-100 rounded-[2rem] overflow-hidden shadow-sm page-break-inside-avoid">
                             <table className="w-full text-center text-xs border-collapse">
                                 <thead className="bg-slate-50 border-b text-slate-400 font-black uppercase tracking-widest">
@@ -252,7 +260,7 @@
                             </table>
                         </div>
 
-                        {/* NARRATIVE SECTIONS */}
+                        {/* VERTICAL NARRATIVES - Cohesive unit */}
                         <div className="flex flex-col space-y-10 pt-8 border-t border-slate-100 page-break-inside-avoid">
                             <div className="space-y-4">
                                 <div className="flex items-center gap-2 text-[#1a3812]">
@@ -266,7 +274,7 @@
                                     <Icons.Map size={22} />
                                     <h4 className="font-black text-[13px] uppercase tracking-widest">Next month's plans</h4>
                                 </div>
-                                <AutoExpandingTextarea value={roadmap || ''} onChange={(e) => onRoadmapSync(title, e.target.value)} className="p-8 bg-indigo-50/20 rounded-[2rem] border border-indigo-100/50 text-slate-800 text-[15px] font-medium leading-relaxed shadow-inner" placeholder="Enter upcoming tactical optimizations and goals..." />
+                                <AutoExpandingTextarea value={roadmap || ''} onChange={(e) => onRoadmapSync(title, e.target.value)} className="p-8 bg-indigo-50/20 rounded-[2rem] border border-indigo-100/50 text-slate-800 text-[15px] font-medium leading-relaxed shadow-inner" placeholder="Enter upcoming tactical optimizations..." />
                             </div>
                         </div>
                     </div>
@@ -434,7 +442,7 @@ GBR: Switch back to registration optimised activity to improve incrementality re
                                     <h2 className="text-8xl font-black text-slate-900 tracking-tighter uppercase leading-none">{selectedRegion} <span className="text-green-600 block">{selectedMonth}</span></h2>
                                     <p className="text-slate-400 font-black uppercase tracking-[0.6em] mt-12 text-[11px]">Performance Intelligence Dossier</p>
                                 </header>
-                                <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
+                                <div className="grid grid-cols-1 md:grid-cols-3 gap-8 kpi-grid">
                                     {[
                                         { l: 'Total Investment', v: new Intl.NumberFormat('en-GB', { style: 'currency', currency: 'GBP', maximumFractionDigits: 0 }).format(stats.cur.spend), ch: stats.mom.s, inv: false },
                                         { l: 'Growth (MNCs)', v: new Intl.NumberFormat('en-US').format(stats.cur.mncs), ch: stats.mom.m, inv: false },
