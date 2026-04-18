@@ -16,22 +16,22 @@
         /* Advanced Print Layout & Grouping */
         @media print {
             @page { 
-                margin: 15mm 10mm; /* Global margins for the page */
+                margin: 15mm 10mm; 
             }
             .no-print { display: none !important; }
             body { background: white !important; padding: 0 !important; margin: 0 !important; }
             .max-w-5xl { max-width: 100% !important; padding: 0 !important; width: 100% !important; margin: 0 !important; }
             
-            /* Add top spacing so content doesn't start immediately */
+            /* Spacing at the top of each page - Halved as requested */
             .page-top-margin {
-                padding-top: 1.5rem !important;
+                padding-top: 0.75rem !important;
             }
 
             /* Each new region section starts on a fresh page */
             .region-section { 
                 page-break-before: always !important;
                 break-before: page !important;
-                padding-top: 2rem !important;
+                padding-top: 1rem !important;
             }
             .region-section:first-of-type {
                 page-break-before: avoid !important;
@@ -39,20 +39,31 @@
                 padding-top: 0 !important;
             }
 
-            /* Every Vendor/Platform section starts on its own page */
+            /* Force Platform sections onto new pages */
             .platform-page-break {
                 page-break-before: always !important;
                 break-before: page !important;
-                padding-top: 2rem !important;
+                padding-top: 1rem !important;
             }
 
-            /* Keep table rows together */
+            /* Internal break for Global Overall dashboard */
+            .force-break-before {
+                page-break-before: always !important;
+                break-before: page !important;
+                padding-top: 1rem !important;
+            }
+
+            /* Keep Narrative Blocks Together */
+            .narrative-block {
+                page-break-inside: avoid !important;
+                break-inside: avoid !important;
+                display: block !important;
+            }
+
             tr { page-break-inside: avoid !important; break-inside: avoid !important; }
             thead { display: table-header-group !important; }
             
-            /* Visual Cleanup */
             .shadow-2xl, .shadow-xl, .shadow-sm { box-shadow: none !important; border: 1px solid #f1f5f9 !important; }
-            .ring-4 { ring: 0 !important; border-width: 1px !important; }
         }
 
         .animate-in { animation: fadeIn 0.8s ease-out; }
@@ -170,7 +181,7 @@
         const REGIONS = ['NORTHAM', 'LATAM', 'ASIA', 'PACIFIC', 'GBR', 'EUROPE', 'MEA'];
 
         // --- DASHBOARD COMPONENT ---
-        const PlatformDashboard = ({ title, dashboard, formatCurrency, formatCPA, formatNumber, isGlobal, onNarrativeChange, onRoadmapSync, commentary, roadmap, isOverall = false }) => {
+        const PlatformDashboard = ({ region, title, dashboard, formatCurrency, formatCPA, formatNumber, isGlobal, onNarrativeChange, onRoadmapSync, commentary, roadmap, isOverall = false }) => {
             if (!dashboard || dashboard.trend.length === 0) return null;
             const { trend, contributionList } = dashboard;
             
@@ -265,8 +276,8 @@
                             </div>
                         </div>
 
-                        {/* TABLE */}
-                        <div className="bg-white border border-slate-100 rounded-[2rem] overflow-hidden shadow-sm">
+                        {/* TABLE - Pushed to Page 2 for Global Overall view */}
+                        <div className={`bg-white border border-slate-100 rounded-[2rem] overflow-hidden shadow-sm ${isOverall && region === 'GLOBAL' ? 'force-break-before' : ''}`}>
                             <table className="w-full text-center text-xs border-collapse">
                                 <thead className="bg-slate-50 border-b text-slate-400 font-black uppercase tracking-widest">
                                     <tr>
@@ -297,17 +308,17 @@
                             </table>
                         </div>
 
-                        {/* NARRATIVES: Show if it's the Overall dashboard OR if it's the GLOBAL view (vendor-based overviews) */}
-                        {(isOverall || isGlobal) && (
+                        {/* NARRATIVES: Block grouped with break-inside avoid */}
+                        {(isOverall || region === 'GLOBAL') && (
                             <div className="flex flex-col space-y-10 pt-8 border-t border-slate-100">
-                                <div className="space-y-4">
+                                <div className="narrative-block space-y-4">
                                     <div className="flex items-center gap-2 text-[#1a3812]">
                                        <Icons.Message size={22} />
                                        <h4 className="font-black text-[13px] uppercase tracking-widest">Strategic Narrative</h4>
                                     </div>
                                     <AutoExpandingTextarea value={commentary || ''} onChange={(e) => onNarrativeChange(title, e.target.value)} className="p-8 bg-slate-50 rounded-[2rem] border border-slate-100 text-slate-800 text-[15px] italic font-medium leading-relaxed shadow-inner" />
                                 </div>
-                                <div className="space-y-4">
+                                <div className="narrative-block space-y-4">
                                     <div className="flex items-center gap-2 text-indigo-900">
                                         <Icons.Map size={22} />
                                         <h4 className="font-black text-[13px] uppercase tracking-widest">Next month's plans</h4>
@@ -567,6 +578,7 @@ GBR: Switch back to registration optimised activity.`;
                                         {rData.dashboards.map(dash => (
                                             <PlatformDashboard 
                                                 key={dash.title} 
+                                                region={rData.region}
                                                 title={dash.title} 
                                                 dashboard={dash} 
                                                 isOverall={dash.title === 'Overall'} 
