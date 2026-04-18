@@ -151,7 +151,8 @@
             });
         }
 
-        const REGIONS = ['NORTHAM', 'LATAM', 'ASIA', 'PACIFIC', 'GBR', 'EUROPE', 'ROW', 'MEA'];
+        // Removed 'ROW' from the primary list as requested
+        const REGIONS = ['NORTHAM', 'LATAM', 'ASIA', 'PACIFIC', 'GBR', 'EUROPE', 'MEA'];
 
         // --- DASHBOARD COMPONENT ---
         const PlatformDashboard = ({ title, dashboard, formatCurrency, formatCPA, formatNumber, isGlobal, onNarrativeChange, onRoadmapSync, commentary, roadmap, isOverall = false }) => {
@@ -323,9 +324,9 @@
                     });
                     
                     const currentRecords = data.filter(r => (region === 'GLOBAL' || r.region?.toUpperCase() === region) && r.date === month && (p === 'Overall' || r.platform === p));
-                    const uniqueLabels = [...new Set(currentRecords.map(r => region === 'GLOBAL' ? r.region : r.country))];
+                    // Strict filter on labels to remove blanks and only process valid territories
+                    const uniqueLabels = [...new Set(currentRecords.map(r => region === 'GLOBAL' ? r.region : r.country))].filter(l => l && l !== "" && l.toLowerCase() !== "unknown");
                     
-                    // Logic to separate Active Markets vs. Rest of [Region]
                     const tempContributionList = uniqueLabels.map(label => {
                         const f = (r) => (region === 'GLOBAL' ? r.region : r.country) === label && (p === 'Overall' || r.platform === p);
                         const curAgg = aggregate(data.filter(r => f(r) && r.date === month));
