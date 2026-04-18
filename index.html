@@ -20,6 +20,7 @@
             body { background: white !important; padding: 0 !important; margin: 0 !important; }
             .max-w-5xl { max-width: 100% !important; padding: 0 !important; width: 100% !important; margin: 0 !important; }
             
+            /* Universal alignment: Ensure all pages start at exactly the same vertical height */
             .region-section, .platform-page-break, .force-break-before {
                 page-break-before: always !important;
                 break-before: page !important;
@@ -48,7 +49,7 @@
         const { useState, useMemo, useEffect, useRef } = React;
 
         // --- GLOBAL CONSTANTS & UTILS ---
-        const apiKey = ""; // Keep empty to avoid GitHub security leaks. Use UI Key input instead.
+        const apiKey = "AIzaSyBUuPsz9oWLWZS5WVQpFxfXAdVQsvg9BrQ"; 
         const REGIONS = ['NORTHAM', 'LATAM', 'ASIA', 'PACIFIC', 'GBR', 'EUROPE', 'MEA'];
         const PLATFORMS_LIST = ['Overall', 'Google AC', 'TTD', 'Moloco'];
         const MONTH_NAMES = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
@@ -218,7 +219,6 @@
             const ltvRange = getRange('ltv');
             const maxMnc = Math.max(...trend.map(d => d.mncs), 1);
 
-            // Lanes: 90-100 (LTV), 65-85 (Spend), 35-60 (Payback)
             const getLaneY = (val, rangeObj, bottomPct, topPct) => {
                 const laneHeight = (topPct - bottomPct) / 100;
                 const relativePos = (val - rangeObj.min) / rangeObj.diff;
@@ -341,27 +341,27 @@
                                         </tr>
                                     ))}
                                 </tbody>
-                                {isOverall && (
+                                {isOverall && summaryTotals && (
                                     <tfoot className="bg-slate-50/50 border-t-2 border-slate-100">
                                         <tr>
                                             <td className="py-5 px-8 text-left uppercase text-green-800 font-black text-[11px]">MoM %</td>
-                                            <td className="py-5 px-4 text-right"><ChangeBadge val={summaryTotals.mom.spend} /></td>
-                                            <td className="py-5 px-4 text-right"><ChangeBadge val={summaryTotals.mom.regs} /></td>
-                                            <td className="py-5 px-4 text-right"><ChangeBadge val={summaryTotals.mom.mncs} /></td>
-                                            <td className="py-5 px-4 text-center"><ChangeBadge val={summaryTotals.mom.cvr} /></td>
-                                            <td className="py-5 px-4 text-center"><ChangeBadge val={summaryTotals.mom.cpa} inverse /></td>
-                                            <td className="py-5 px-4 text-center"><ChangeBadge val={summaryTotals.mom.ltv} /></td>
-                                            <td className="py-5 px-4 text-right pr-10"><ChangeBadge val={summaryTotals.mom.payback} inverse /></td>
+                                            <td className="py-5 px-4 text-right"><ChangeBadge val={summaryTotals.mom?.spend} /></td>
+                                            <td className="py-5 px-4 text-right"><ChangeBadge val={summaryTotals.mom?.regs} /></td>
+                                            <td className="py-5 px-4 text-right"><ChangeBadge val={summaryTotals.mom?.mncs} /></td>
+                                            <td className="py-5 px-4 text-center"><ChangeBadge val={summaryTotals.mom?.cvr} /></td>
+                                            <td className="py-5 px-4 text-center"><ChangeBadge val={summaryTotals.mom?.cpa} inverse /></td>
+                                            <td className="py-5 px-4 text-center"><ChangeBadge val={summaryTotals.mom?.ltv} /></td>
+                                            <td className="py-5 px-4 text-right pr-10"><ChangeBadge val={summaryTotals.mom?.payback} inverse /></td>
                                         </tr>
                                         <tr>
                                             <td className="py-5 px-8 text-left uppercase text-green-800 font-black text-[11px]">YoY %</td>
-                                            <td className="py-5 px-4 text-right border-t border-slate-100/50"><ChangeBadge val={summaryTotals.yoy.spend} /></td>
-                                            <td className="py-5 px-4 text-right border-t border-slate-100/50"><ChangeBadge val={summaryTotals.yoy.regs} /></td>
-                                            <td className="py-5 px-4 text-right border-t border-slate-100/50"><ChangeBadge val={summaryTotals.yoy.mncs} /></td>
-                                            <td className="py-5 px-4 text-center border-t border-slate-100/50"><ChangeBadge val={summaryTotals.yoy.cvr} /></td>
-                                            <td className="py-5 px-4 text-center border-t border-slate-100/50"><ChangeBadge val={summaryTotals.yoy.cpa} inverse /></td>
-                                            <td className="py-5 px-4 text-center border-t border-slate-100/50"><ChangeBadge val={summaryTotals.yoy.ltv} /></td>
-                                            <td className="py-5 px-4 text-right pr-10 border-t border-slate-100/50"><ChangeBadge val={summaryTotals.yoy.payback} inverse /></td>
+                                            <td className="py-5 px-4 text-right border-t border-slate-100/50"><ChangeBadge val={summaryTotals.yoy?.spend} /></td>
+                                            <td className="py-5 px-4 text-right border-t border-slate-100/50"><ChangeBadge val={summaryTotals.yoy?.regs} /></td>
+                                            <td className="py-5 px-4 text-right border-t border-slate-100/50"><ChangeBadge val={summaryTotals.yoy?.mncs} /></td>
+                                            <td className="py-5 px-4 text-center border-t border-slate-100/50"><ChangeBadge val={summaryTotals.yoy?.cvr} /></td>
+                                            <td className="py-5 px-4 text-center border-t border-slate-100/50"><ChangeBadge val={summaryTotals.yoy?.cpa} inverse /></td>
+                                            <td className="py-5 px-4 text-center border-t border-slate-100/50"><ChangeBadge val={summaryTotals.yoy?.ltv} /></td>
+                                            <td className="py-5 px-4 text-right pr-10 border-t border-slate-100/50"><ChangeBadge val={summaryTotals.yoy?.payback} inverse /></td>
                                         </tr>
                                     </tfoot>
                                 )}
@@ -485,6 +485,10 @@
 
             const getRegionData = (region, month) => {
                 if (!month) return null;
+                const [y, mNum] = month.split('-').map(Number);
+                const pmS = `${mNum === 1 ? y-1 : y}-${String(mNum === 1 ? 12 : mNum-1).padStart(2, '0')}`;
+                const pyS = `${y-1}-${String(mNum).padStart(2, '0')}`;
+
                 const regionDashboards = PLATFORMS_LIST.map(p => {
                     const trend = [...new Set(data.map(d => d.date))].sort().map(date => ({ month: date, ...aggregate(data.filter(r => (region === 'GLOBAL' || r.region?.toUpperCase() === region) && r.date === date && (p === 'Overall' || r.platform === p))) }));
                     const currentRecords = data.filter(r => (region === 'GLOBAL' || r.region?.toUpperCase() === region) && r.date === month && (p === 'Overall' || r.platform === p));
@@ -498,11 +502,19 @@
                             return { label, ...cur };
                         }).filter(item => item.spend > 0 || item.mncs > 0).sort((a,b) => b.spend - a.spend);
                     }
-                    return { title: p, trend, contributionList };
+
+                    const curT = aggregate(data.filter(r => (region === 'GLOBAL' || r.region?.toUpperCase() === region) && r.date === month && (p === 'Overall' || r.platform === p)));
+                    const pmT = aggregate(data.filter(r => (region === 'GLOBAL' || r.region?.toUpperCase() === region) && r.date === pmS && (p === 'Overall' || r.platform === p)));
+                    const pyT = aggregate(data.filter(r => (region === 'GLOBAL' || r.region?.toUpperCase() === region) && r.date === pyS && (p === 'Overall' || r.platform === p)));
+                    const calcPct = (c, pVal) => pVal > 0 ? (c - pVal) / pVal : 0;
+                    const summaryTotals = { 
+                        mom: { spend: calcPct(curT.spend, pmT.spend), regs: calcPct(curT.regs, pmT.regs), mncs: calcPct(curT.mncs, pmT.mncs), cvr: calcPct(curT.cvr, pmT.cvr), cpa: calcPct(curT.cpa, pmT.cpa), ltv: calcPct(curT.ltv, pmT.ltv), payback: calcPct(curT.payback, pmT.payback) }, 
+                        yoy: { spend: calcPct(curT.spend, pyT.spend), regs: calcPct(curT.regs, pyT.regs), mncs: calcPct(curT.mncs, pyT.mncs), cvr: calcPct(curT.cvr, pyT.cvr), cpa: calcPct(curT.cpa, pyT.cpa), ltv: calcPct(curT.ltv, pyT.ltv), payback: calcPct(curT.payback, pyT.payback) } 
+                    };
+
+                    return { title: p, trend, contributionList, summaryTotals };
                 });
                 const curS = aggregate(data.filter(r => (region === 'GLOBAL' || r.region?.toUpperCase() === region) && r.date === month));
-                const [y, mNum] = month.split('-').map(Number);
-                const pmS = `${mNum === 1 ? y-1 : y}-${String(mNum === 1 ? 12 : mNum-1).padStart(2, '0')}`;
                 const pmS2 = aggregate(data.filter(r => (region === 'GLOBAL' || r.region?.toUpperCase() === region) && r.date === pmS));
                 return { region, stats: { cur: curS, mom: { spend: pmS2.spend ? (curS.spend-pmS2.spend)/pmS2.spend : 0, mncs: pmS2.mncs ? (curS.mncs-pmS2.mncs)/pmS2.mncs : 0, payback: pmS2.payback ? (curS.payback-pmS2.payback)/pmS2.payback : 0 } }, dashboards: regionDashboards };
             };
