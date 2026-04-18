@@ -151,7 +151,6 @@
             });
         }
 
-        // Removed 'ROW' from the primary list as requested
         const REGIONS = ['NORTHAM', 'LATAM', 'ASIA', 'PACIFIC', 'GBR', 'EUROPE', 'MEA'];
 
         // --- DASHBOARD COMPONENT ---
@@ -342,13 +341,14 @@
                     
                     if (noSpendMarkets.length > 0) {
                         const restLabel = region === 'GLOBAL' ? "Rest of World" : `Rest of ${region}`;
+                        const totalMNCs = noSpendMarkets.reduce((acc, curr) => acc + curr.mncs, 0);
                         const restAgg = {
                             label: restLabel,
                             spend: 0,
-                            mncs: noSpendMarkets.reduce((acc, curr) => acc + curr.mncs, 0),
+                            mncs: totalMNCs,
                             cpa: 0,
-                            payback: noSpendMarkets.reduce((acc, curr) => acc + (curr.payback * curr.mncs), 0) / noSpendMarkets.reduce((acc, curr) => acc + curr.mncs, 0),
-                            ltv: noSpendMarkets.reduce((acc, curr) => acc + (curr.ltv * curr.mncs), 0) / noSpendMarkets.reduce((acc, curr) => acc + curr.mncs, 0),
+                            payback: totalMNCs > 0 ? noSpendMarkets.reduce((acc, curr) => acc + (curr.payback * curr.mncs), 0) / totalMNCs : 0,
+                            ltv: totalMNCs > 0 ? noSpendMarkets.reduce((acc, curr) => acc + (curr.ltv * curr.mncs), 0) / totalMNCs : 0,
                             momChange: 0,
                             yoyChange: 0
                         };
@@ -425,6 +425,10 @@ PACIFIC: Continue running the GAC iOS test in AUS and implement tracked calibrat
 GBR: Switch back to registration optimised activity, as in-platform incrementality test showed poorer results with purchase.`;
             };
 
+            const formatAccurateCurrency = (v) => {
+                return new Intl.NumberFormat('en-GB', { style: 'currency', currency: 'GBP', minimumFractionDigits: 2 }).format(v);
+            };
+
             return (
                 <div className="min-h-screen bg-[#f8fafc] pb-32">
                     <nav className="w-full bg-[#1a3812] p-8 flex items-center justify-between no-print shadow-2xl border-b-[8px] border-green-900/20">
@@ -492,7 +496,7 @@ GBR: Switch back to registration optimised activity, as in-platform incrementali
                                                 title={dash.title} 
                                                 dashboard={dash} 
                                                 isOverall={dash.title === 'Overall'} 
-                                                formatCurrency={v => `£${Math.round(v/1000)}k`} 
+                                                formatCurrency={formatAccurateCurrency} 
                                                 formatCPA={v => `£${v.toFixed(2)}`} 
                                                 formatNumber={v => v.toLocaleString()} 
                                                 isGlobal={rData.region === 'GLOBAL'} 
