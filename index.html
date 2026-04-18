@@ -13,13 +13,11 @@
         @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;700;900&display=swap');
         body { font-family: 'Inter', sans-serif; -webkit-print-color-adjust: exact; }
         
-        /* Print-specific optimizations */
         @media print {
             .no-print { display: none !important; }
             body { background: white !important; padding: 0 !important; margin: 0 !important; }
             .max-w-5xl { max-width: 100% !important; padding: 0 !important; width: 100% !important; margin: 0 !important; }
             
-            /* Section management */
             .region-section { 
                 page-break-before: always !important;
                 break-before: page !important;
@@ -323,15 +321,38 @@
                         const match = data.filter(r => (region === 'GLOBAL' || r.region?.toUpperCase() === region) && r.date === date && (p === 'Overall' || r.platform === p));
                         return { month: date, ...aggregate(match) };
                     });
-                    const current = data.filter(r => (region === 'GLOBAL' || r.region?.toUpperCase() === region) && r.date === month && (p === 'Overall' || r.platform === p));
-                    const labels = [...new Set(current.map(r => region === 'GLOBAL' ? r.region : r.country))];
-                    const contributionList = labels.map(label => {
+                    
+                    const currentRecords = data.filter(r => (region === 'GLOBAL' || r.region?.toUpperCase() === region) && r.date === month && (p === 'Overall' || r.platform === p));
+                    const uniqueLabels = [...new Set(currentRecords.map(r => region === 'GLOBAL' ? r.region : r.country))];
+                    
+                    // Logic to separate Active Markets vs. Rest of [Region]
+                    const tempContributionList = uniqueLabels.map(label => {
                         const f = (r) => (region === 'GLOBAL' ? r.region : r.country) === label && (p === 'Overall' || r.platform === p);
-                        const cur = aggregate(data.filter(r => f(r) && r.date === month));
-                        const pm = aggregate(data.filter(r => f(r) && r.date === pmS));
-                        const py = aggregate(data.filter(r => f(r) && r.date === pyS));
-                        return { label, ...cur, momChange: pm.mncs ? (cur.mncs-pm.mncs)/pm.mncs : 0, yoyChange: py.mncs ? (cur.mncs-py.mncs)/py.mncs : 0 };
-                    }).sort((a,b) => b.spend - a.spend);
+                        const curAgg = aggregate(data.filter(r => f(r) && r.date === month));
+                        const pmAgg = aggregate(data.filter(r => f(r) && r.date === pmS));
+                        const pyAgg = aggregate(data.filter(r => f(r) && r.date === pyS));
+                        return { label, ...curAgg, momChange: pmAgg.mncs ? (curAgg.mncs-pmAgg.mncs)/pmAgg.mncs : 0, yoyChange: pyAgg.mncs ? (curAgg.mncs-pyAgg.mncs)/pyAgg.mncs : 0 };
+                    }).filter(item => item.spend > 0 || item.mncs > 0);
+
+                    const activeMarkets = tempContributionList.filter(item => item.spend > 0);
+                    const noSpendMarkets = tempContributionList.filter(item => item.spend === 0 && item.mncs > 0);
+                    
+                    let contributionList = [...activeMarkets].sort((a,b) => b.spend - a.spend);
+                    
+                    if (noSpendMarkets.length > 0) {
+                        const restLabel = region === 'GLOBAL' ? "Rest of World" : `Rest of ${region}`;
+                        const restAgg = {
+                            label: restLabel,
+                            spend: 0,
+                            mncs: noSpendMarkets.reduce((acc, curr) => acc + curr.mncs, 0),
+                            cpa: 0,
+                            payback: noSpendMarkets.reduce((acc, curr) => acc + (curr.payback * curr.mncs), 0) / noSpendMarkets.reduce((acc, curr) => acc + curr.mncs, 0),
+                            ltv: noSpendMarkets.reduce((acc, curr) => acc + (curr.ltv * curr.mncs), 0) / noSpendMarkets.reduce((acc, curr) => acc + curr.mncs, 0),
+                            momChange: 0,
+                            yoyChange: 0
+                        };
+                        contributionList.push(restAgg);
+                    }
                     
                     return { title: p, trend, contributionList };
                 });
@@ -348,7 +369,6 @@
 
             const fullReport = useMemo(() => {
                 if (!data.length || !selectedMonth) return [];
-                // If GLOBAL is selected, show Global first, then map all regions
                 const regionsToProcess = selectedRegion === 'GLOBAL' ? ['GLOBAL', ...REGIONS] : [selectedRegion];
                 return regionsToProcess.map(r => getRegionData(r, selectedMonth));
             }, [data, selectedRegion, selectedMonth]);
@@ -368,24 +388,27 @@
                 const monthName = getMonthName(selectedMonth);
 
                 if (p === 'Overall') {
-                    const gacMatch = data.filter(r => (region === 'GLOBAL' || r.region?.toUpperCase() === region) && r.date === selectedMonth && r.platform === 'Google AC');
-                    const ttdMatch = data.filter(r => (region === 'GLOBAL' || r.region?.toUpperCase() === region) && r.date === selectedMonth && r.platform === 'TTD');
-                    const gacAgg = aggregate(gacMatch);
-                    const ttdAgg = aggregate(ttdMatch);
-                    const topEfficiency = [...dash.contributionList].sort((a,b) => a.payback - b.payback)[0];
+                    const gacAgg = aggregate(data.filter(r => (region === 'GLOBAL' || r.region?.toUpperCase() === region) && r.date === selectedMonth && r.platform === 'Google AC'));
+                    const ttdAgg = aggregate(data.filter(r => (region === 'GLOBAL' || r.region?.toUpperCase() === region) && r.date === selectedMonth && r.platform === 'TTD'));
+                    const topEfficiency = [...dash.contributionList].filter(i=>i.spend>0).sort((a,b) => a.payback - b.payback)[0];
 
                     return `Overall:
-In ${monthName}, we drove ${cur.mncs.toLocaleString()} MNCs (${growth >= 0 ? '+' : ''}${growth}% MoM) on £${cur.spend.toLocaleString()} spend, resulting in a payback of ${cur.payback.toFixed(1)}m (${pbGrowth >= 0 ? '+' : ''}${pbGrowth}% MoM). 
-The majority of MNCs came from: ${topContributor?.label || 'N/A'} (${topContributor?.mncs.toLocaleString() || 0}). ${topEfficiency?.label || "N/A"} led in efficiency with a ${topEfficiency?.payback.toFixed(1)}m payback. ${ttdAgg.mncs > gacAgg.mncs ? 'TTD' : 'GAC'} was the largest contributor to MNC volume (${ttdAgg.mncs.toLocaleString()} vs. ${gacAgg.mncs.toLocaleString()} from ${ttdAgg.mncs > gacAgg.mncs ? 'GAC' : 'TTD'}).
+In ${monthName}, we drove ${cur.mncs.toLocaleString()} MNCs (${growth >= 0 ? '+' : ''}${growth}% MoM) on £${Math.round(cur.spend).toLocaleString()} spend, resulting in a payback of ${cur.payback.toFixed(1)}m (${pbGrowth >= 0 ? '+' : ''}${pbGrowth}% MoM).
+The majority of MNCs came from: ${topContributor?.label} (${topContributor?.mncs.toLocaleString()}). ${topEfficiency?.label || "N/A"} led in efficiency with a ${topEfficiency?.payback.toFixed(1)}m payback. ${ttdAgg.mncs > gacAgg.mncs ? 'TTD' : 'GAC'} was the largest contributor to MNC volume (${ttdAgg.mncs.toLocaleString()} vs. ${gacAgg.mncs.toLocaleString()} from ${ttdAgg.mncs > gacAgg.mncs ? 'GAC' : 'TTD'}).
 
 Main Highlights / Performance Influencers: 
-• Activity adjustments were implemented across ${region} to optimize CPA and improve overall weighted payback metrics. Performance remains stable while conducting ongoing strategic tests.`;
+• LATAM: Performance remained stable, maintaining spend levels. Volume was partially offset by a strong LTV improvement.
+• NORTHAM: Tracked at strong efficiency, demonstrating robust market resilience.
+• EUROPE: Campaign optimizations were implemented to find adequate cost-per-incremental-signup setups.
+• ASIA: Significant growth led by specific market strategic adjustments to Purchase optimization.
+• PACIFIC: Achieving initial metrics with focus on efficiency optimization to track under the 15m goal.
+• GBR: Activity adjustments running to improve overall CPA and efficiency.`;
                 }
 
                 return `Platform/Vendor:
 In ${monthName}, ${p} drove ${cur.mncs.toLocaleString()} MNCs at a ${cur.payback.toFixed(1)}m payback.
 Top MNC contributors: ${dash.contributionList.slice(0, 3).map(c => c.label).join(' > ')}.
-Overall performance is ${cur.payback <= 15 ? 'efficient' : 'tracking above goal'}, ${cur.payback <= 15 ? 'tracking under' : 'currently exceeding'} the 15m goal.`;
+Overall performance is ${cur.payback <= 15 ? 'efficient' : 'tracking above goal'}, ${cur.payback <= 15 ? 'tracking under' : 'currently exceeding'} the 15m goal. ${topContributor?.label} showed strong performance with a ${topContributor?.payback.toFixed(1)}m payback.`;
             };
 
             const getRoadmap = (region, p) => {
@@ -393,9 +416,12 @@ Overall performance is ${cur.payback <= 15 ? 'efficient' : 'tracking above goal'
                 if (roadmaps[key]) return roadmaps[key];
                 return `Major Plans for Next Month
 
-• Maintain performance while conducting incrementality tests to build certainty for activity.
-• Review and optimize creative engines for core high-velocity markets.
-• Increase spend for non-MMM segments that are demonstrating strong efficiency.`;
+LATAM: Maintain performance while conducting incrementality tests to build certainty for GAC activity.
+NORTHAM: USA conversion lift test and Creative Engine test.
+EUROPE: Increase BAU spend for 4 non-MMM countries (Spain, Netherlands, Hungary, Finland).
+ASIA: Test English Purchase Campaign in BAU activity to improve campaign CVR, and monitor/optimise iOS testing in Japan.
+PACIFIC: Continue running the GAC iOS test in AUS and implement tracked calibrated registrations in AUS.
+GBR: Switch back to registration optimised activity, as in-platform incrementality test showed poorer results with purchase.`;
             };
 
             return (
