@@ -16,41 +16,44 @@
         /* Advanced Print Layout & Grouping */
         @media print {
             @page { 
-                margin: 15mm 10mm; 
+                margin: 10mm; /* Strict 10mm margin on all sides */
             }
             .no-print { display: none !important; }
             body { background: white !important; padding: 0 !important; margin: 0 !important; }
             .max-w-5xl { max-width: 100% !important; padding: 0 !important; width: 100% !important; margin: 0 !important; }
             
-            /* Spacing at the top of each page - Halved as requested */
+            /* Remove manual paddings to ensure all pages start at the same height (exactly at the 10mm margin) */
             .page-top-margin {
-                padding-top: 0.75rem !important;
+                padding-top: 0 !important;
+                margin-top: 0 !important;
             }
 
-            /* Each new region section starts on a fresh page */
+            /* Each new region section starts on a fresh page at the same height */
             .region-section { 
                 page-break-before: always !important;
                 break-before: page !important;
-                padding-top: 1rem !important;
+                padding-top: 0 !important;
+                margin-top: 0 !important;
             }
             .region-section:first-of-type {
                 page-break-before: avoid !important;
                 break-before: avoid !important;
-                padding-top: 0 !important;
             }
 
-            /* Force Platform sections onto new pages */
+            /* Force Platform sections onto new pages at the same height */
             .platform-page-break {
                 page-break-before: always !important;
                 break-before: page !important;
-                padding-top: 1rem !important;
+                padding-top: 0 !important;
+                margin-top: 0 !important;
             }
 
-            /* Internal break for Global Overall dashboard */
+            /* Internal break for Global Overall dashboard table */
             .force-break-before {
                 page-break-before: always !important;
                 break-before: page !important;
-                padding-top: 1rem !important;
+                padding-top: 0 !important;
+                margin-top: 0 !important;
             }
 
             /* Keep Narrative Blocks Together */
