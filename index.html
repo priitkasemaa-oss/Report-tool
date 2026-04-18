@@ -13,30 +13,54 @@
         @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;700;900&display=swap');
         body { font-family: 'Inter', sans-serif; -webkit-print-color-adjust: exact; }
         
+        /* Advanced Print Optimizations */
         @media print {
             .no-print { display: none !important; }
             body { background: white !important; padding: 0 !important; margin: 0 !important; }
             .max-w-5xl { max-width: 100% !important; padding: 0 !important; width: 100% !important; margin: 0 !important; }
             
+            /* Ensure each region starts fresh */
             .region-section { 
                 page-break-before: always !important;
                 break-before: page !important;
+                padding-top: 1rem !important;
             }
             .region-section:first-of-type {
                 page-break-before: avoid !important;
                 break-before: avoid !important;
             }
 
-            .page-break-inside-avoid { 
-                page-break-inside: avoid !important; 
-                break-inside: avoid-page !important;
-                margin-bottom: 1.5rem !important;
+            /* Logical Grouping: Keep units together */
+            .print-group {
+                page-break-inside: avoid !important;
+                break-inside: avoid !important;
                 display: block !important;
+                margin-bottom: 2rem !important;
+            }
+
+            /* Matrix Table specific grouping */
+            .matrix-container {
+                page-break-inside: avoid !important;
+                break-inside: avoid !important;
             }
             
+            /* Narrative specific grouping */
+            .narrative-container {
+                page-break-inside: avoid !important;
+                break-inside: avoid !important;
+                margin-top: 2rem !important;
+            }
+
             tr { page-break-inside: avoid !important; break-inside: avoid !important; }
             thead { display: table-header-group !important; }
+            
+            /* Remove shadows for cleaner PDF print */
             .shadow-2xl, .shadow-xl, .shadow-sm { box-shadow: none !important; border: 1px solid #f1f5f9 !important; }
+            
+            /* Adjust spacing for print density */
+            .space-y-32 { spacing: 4rem !important; margin-top: 4rem !important; }
+            .space-y-16 { spacing: 2rem !important; margin-top: 2rem !important; }
+            .p-12 { padding: 2rem !important; }
         }
 
         .animate-in { animation: fadeIn 0.8s ease-out; }
@@ -183,50 +207,54 @@
                     </div>
                     
                     <div className="p-10 space-y-12">
-                        <div className="w-full bg-white overflow-visible border-b border-slate-50 pb-8 page-break-inside-avoid">
-                            <svg viewBox={`0 0 ${svgWidth} ${svgHeight}`} className="w-full h-auto overflow-visible block">
-                                <defs>
-                                    <filter id="halo" x="-50%" y="-50%" width="200%" height="200%">
-                                        <feFlood floodColor="white" result="bg" /><feMorphology in="SourceAlpha" operator="dilate" radius="1.2" result="dilated" />
-                                        <feComposite in="bg" in2="dilated" operator="in" result="outline" /><feMerge><feMergeNode in="outline" /><feMergeNode in="SourceGraphic" /></feMerge>
-                                    </filter>
-                                </defs>
-                                {[0, 0.25, 0.5, 0.75, 1].map(r => <line key={r} x1={pL} y1={pY + cH * r} x2={svgWidth - pR} y2={pY + cH * r} stroke="#f1f5f9" strokeWidth="1" />)}
-                                
-                                <path d={buildPath(trend.map((d,i)=>({x:getX(i), y:getY(d.spend, maxSpend)})))} fill="none" stroke="#ef4444" strokeWidth="3" opacity="0.4" />
-                                <path d={buildPath(trend.map((d,i)=>({x:getX(i), y:getY(d.ltv, maxLtv)})))} fill="none" stroke="#10b981" strokeWidth="2.5" strokeDasharray="6 4" opacity="0.4" />
-                                <path d={buildPath(trend.map((d,i)=>({x:getX(i), y:getY(d.payback, maxPb)})))} fill="none" stroke="#f59e0b" strokeWidth="4" />
+                        {/* 1. GRAPH UNIT: Header + Graph */}
+                        <div className="print-group">
+                            <div className="w-full bg-white overflow-visible border-b border-slate-50 pb-8">
+                                <svg viewBox={`0 0 ${svgWidth} ${svgHeight}`} className="w-full h-auto overflow-visible block">
+                                    <defs>
+                                        <filter id="halo" x="-50%" y="-50%" width="200%" height="200%">
+                                            <feFlood floodColor="white" result="bg" /><feMorphology in="SourceAlpha" operator="dilate" radius="1.2" result="dilated" />
+                                            <feComposite in="bg" in2="dilated" operator="in" result="outline" /><feMerge><feMergeNode in="outline" /><feMergeNode in="SourceGraphic" /></feMerge>
+                                        </filter>
+                                    </defs>
+                                    {[0, 0.25, 0.5, 0.75, 1].map(r => <line key={r} x1={pL} y1={pY + cH * r} x2={svgWidth - pR} y2={pY + cH * r} stroke="#f1f5f9" strokeWidth="1" />)}
+                                    
+                                    <path d={buildPath(trend.map((d,i)=>({x:getX(i), y:getY(d.spend, maxSpend)})))} fill="none" stroke="#ef4444" strokeWidth="3" opacity="0.4" />
+                                    <path d={buildPath(trend.map((d,i)=>({x:getX(i), y:getY(d.ltv, maxLtv)})))} fill="none" stroke="#10b981" strokeWidth="2.5" strokeDasharray="6 4" opacity="0.4" />
+                                    <path d={buildPath(trend.map((d,i)=>({x:getX(i), y:getY(d.payback, maxPb)})))} fill="none" stroke="#f59e0b" strokeWidth="4" />
 
-                                {trend.map((d, i) => {
-                                    const x = getX(i);
-                                    const mncH = (d.mncs / maxMnc) * cH;
-                                    const labels = [
-                                        { id: 's', val: `£${Math.round(d.spend/1000)}k`, y: getY(d.spend, maxSpend), color: '#ef4444' },
-                                        { id: 'pb', val: `${d.payback.toFixed(1)}m`, y: getY(d.payback, maxPb), color: '#f59e0b' },
-                                        { id: 'ltv', val: `£${Math.round(d.ltv)}`, y: getY(d.ltv, maxLtv), color: '#10b981' }
-                                    ].sort((a, b) => a.y - b.y);
+                                    {trend.map((d, i) => {
+                                        const x = getX(i);
+                                        const mncH = (d.mncs / maxMnc) * cH;
+                                        const labels = [
+                                            { id: 's', val: `£${Math.round(d.spend/1000)}k`, y: getY(d.spend, maxSpend), color: '#ef4444' },
+                                            { id: 'pb', val: `${d.payback.toFixed(1)}m`, y: getY(d.payback, maxPb), color: '#f59e0b' },
+                                            { id: 'ltv', val: `£${Math.round(d.ltv)}`, y: getY(d.ltv, maxLtv), color: '#10b981' }
+                                        ].sort((a, b) => a.y - b.y);
 
-                                    if (labels[1].y - labels[0].y < 24) labels[1].y = labels[0].y + 24;
-                                    if (labels[2].y - labels[1].y < 24) labels[2].y = labels[1].y + 24;
+                                        if (labels[1].y - labels[0].y < 24) labels[1].y = labels[0].y + 24;
+                                        if (labels[2].y - labels[1].y < 24) labels[2].y = labels[1].y + 24;
 
-                                    return (
-                                        <g key={i}>
-                                            <rect x={x - 15} y={pY + cH - mncH} width={30} height={mncH} fill="#6366f1" fillOpacity={d.spend > 0 ? 0.8 : 0.1} rx={4} />
-                                            {d.spend > 0 && labels.map(lbl => (
-                                                <g key={lbl.id}>
-                                                    <rect x={x - 20} y={lbl.y - 30} width={40} height={18} rx={9} fill="white" stroke={lbl.color} strokeWidth="1.2" />
-                                                    <text x={x} y={lbl.y - 18} textAnchor="middle" fill={lbl.color} fontSize="9" fontWeight="900" filter="url(#halo)">{lbl.val}</text>
-                                                </g>
-                                            ))}
-                                            <circle cx={x} cy={getY(d.payback, maxPb)} r="5" fill="#f59e0b" stroke="white" strokeWidth="2" />
-                                            <text x={x} y={pY + cH + 30} textAnchor="middle" fill="#94a3b8" fontSize="10" fontWeight="bold" transform={`rotate(-35, ${x}, ${pY + cH + 30})`}>{d.month}</text>
-                                        </g>
-                                    );
-                                })}
-                            </svg>
+                                        return (
+                                            <g key={i}>
+                                                <rect x={x - 15} y={pY + cH - mncH} width={30} height={mncH} fill="#6366f1" fillOpacity={d.spend > 0 ? 0.8 : 0.1} rx={4} />
+                                                {d.spend > 0 && labels.map(lbl => (
+                                                    <g key={lbl.id}>
+                                                        <rect x={x - 20} y={lbl.y - 30} width={40} height={18} rx={9} fill="white" stroke={lbl.color} strokeWidth="1.2" />
+                                                        <text x={x} y={lbl.y - 18} textAnchor="middle" fill={lbl.color} fontSize="9" fontWeight="900" filter="url(#halo)">{lbl.val}</text>
+                                                    </g>
+                                                ))}
+                                                <circle cx={x} cy={getY(d.payback, maxPb)} r="5" fill="#f59e0b" stroke="white" strokeWidth="2" />
+                                                <text x={x} y={pY + cH + 30} textAnchor="middle" fill="#94a3b8" fontSize="10" fontWeight="bold" transform={`rotate(-35, ${x}, ${pY + cH + 30})`}>{d.month}</text>
+                                            </g>
+                                        );
+                                    })}
+                                </svg>
+                            </div>
                         </div>
 
-                        <div className="bg-white border border-slate-100 rounded-[2rem] overflow-hidden shadow-sm page-break-inside-avoid">
+                        {/* 2. TABLE UNIT: Keep matrix together */}
+                        <div className="matrix-container bg-white border border-slate-100 rounded-[2rem] overflow-hidden shadow-sm">
                             <table className="w-full text-center text-xs border-collapse">
                                 <thead className="bg-slate-50 border-b text-slate-400 font-black uppercase tracking-widest">
                                     <tr>
@@ -257,7 +285,8 @@
                             </table>
                         </div>
 
-                        <div className="flex flex-col space-y-10 pt-8 border-t border-slate-100 page-break-inside-avoid">
+                        {/* 3. NARRATIVE UNIT: Keep analysis/roadmap together */}
+                        <div className="narrative-container flex flex-col space-y-10 pt-8 border-t border-slate-100">
                             <div className="space-y-4">
                                 <div className="flex items-center gap-2 text-[#1a3812]">
                                    <Icons.Message size={22} />
@@ -323,7 +352,6 @@
                     });
                     
                     const currentRecords = data.filter(r => (region === 'GLOBAL' || r.region?.toUpperCase() === region) && r.date === month && (p === 'Overall' || r.platform === p));
-                    // Strict filter on labels to remove blanks and only process valid territories
                     const uniqueLabels = [...new Set(currentRecords.map(r => region === 'GLOBAL' ? r.region : r.country))].filter(l => l && l !== "" && l.toLowerCase() !== "unknown");
                     
                     const tempContributionList = uniqueLabels.map(label => {
