@@ -20,7 +20,6 @@
             body { background: white !important; padding: 0 !important; margin: 0 !important; }
             .max-w-5xl { max-width: 100% !important; padding: 0 !important; width: 100% !important; margin: 0 !important; }
             
-            /* Universal alignment: Ensure all pages start at exactly the same vertical height */
             .region-section, .platform-page-break, .force-break-before {
                 page-break-before: always !important;
                 break-before: page !important;
@@ -49,6 +48,7 @@
         const { useState, useMemo, useEffect, useRef } = React;
 
         // --- GLOBAL CONSTANTS & UTILS ---
+        const apiKey = ""; // Keep empty to avoid GitHub security leaks. Use UI Key input instead.
         const REGIONS = ['NORTHAM', 'LATAM', 'ASIA', 'PACIFIC', 'GBR', 'EUROPE', 'MEA'];
         const PLATFORMS_LIST = ['Overall', 'Google AC', 'TTD', 'Moloco'];
         const MONTH_NAMES = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
@@ -75,7 +75,7 @@
         // Exponential backoff AI call helper
         const callGemini = async (prompt, systemInstruction, providedKey) => {
             // Priority: provided key > environment key
-            const finalKey = providedKey || "";
+            const finalKey = providedKey || apiKey || "";
             const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-09-2025:generateContent?key=${finalKey}`;
             const payload = {
                 contents: [{ parts: [{ text: prompt }] }],
@@ -218,6 +218,7 @@
             const ltvRange = getRange('ltv');
             const maxMnc = Math.max(...trend.map(d => d.mncs), 1);
 
+            // Lanes: 90-100 (LTV), 65-85 (Spend), 35-60 (Payback)
             const getLaneY = (val, rangeObj, bottomPct, topPct) => {
                 const laneHeight = (topPct - bottomPct) / 100;
                 const relativePos = (val - rangeObj.min) / rangeObj.diff;
@@ -308,6 +309,65 @@
                             </div>
                         </div>
 
+                        <div className={`bg-white border border-slate-100 rounded-[2rem] overflow-hidden shadow-sm ${isOverall && region === 'GLOBAL' ? 'force-break-before' : ''}`}>
+                            <table className="w-full text-center text-xs border-collapse">
+                                <thead className="bg-[#1a2d1a] border-b text-white font-black uppercase tracking-widest">
+                                    <tr>
+                                        <th className="py-5 px-8 text-left whitespace-nowrap">{isOverall ? region : (isGlobal ? 'Region' : 'Market')}</th>
+                                        <th className="py-5 px-4 text-right">Investment</th>
+                                        {isOverall && <th className="py-5 px-4 text-right">Regs</th>}
+                                        <th className="py-5 px-4 text-right">MNCs</th>
+                                        {!isOverall && <th className="py-5 px-4 text-center">MoM%</th>}
+                                        {!isOverall && <th className="py-5 px-4 text-center">YoY%</th>}
+                                        {isOverall && <th className="py-5 px-4">CVR</th>}
+                                        <th className="py-5 px-4 text-[#ef4444]">CPA</th>
+                                        <th className="py-5 px-4 text-[#10b981]">LTV</th>
+                                        <th className="py-5 px-4 text-right pr-10">PB</th>
+                                    </tr>
+                                </thead>
+                                <tbody className="divide-y divide-slate-50 font-bold">
+                                    {contributionList.map((item, i) => (
+                                        <tr key={i} className="hover:bg-slate-50/50 transition-colors">
+                                            <td className="py-4 px-8 text-left uppercase text-slate-900 font-black">{item.label}</td>
+                                            <td className="py-4 px-4 text-right text-slate-500 font-medium">£{item.spend.toLocaleString(undefined, {minimumFractionDigits: 2})}</td>
+                                            {isOverall && <td className="py-4 px-4 text-right text-slate-900 font-black">{item.regs?.toLocaleString()}</td>}
+                                            <td className="py-4 px-4 text-right text-slate-900 font-black">{item.mncs.toLocaleString()}</td>
+                                            {!isOverall && <td className="py-4 px-4 text-center"><ChangeBadge val={item.momChange} /></td>}
+                                            {!isOverall && <td className="py-4 px-4 text-center"><ChangeBadge val={item.yoyChange} /></td>}
+                                            {isOverall && <td className="py-4 px-4 text-slate-500">{((item.mncs / (item.regs || 1)) * 100).toFixed(1)}%</td>}
+                                            <td className="py-4 px-4 text-[#ef4444] font-black">£{item.cpa.toFixed(2)}</td>
+                                            <td className="py-4 px-4 text-[#10b981]">£{Math.round(item.ltv)}</td>
+                                            <td className="py-4 px-4 text-right pr-10 text-slate-900 font-black">{item.payback.toFixed(1)}m</td>
+                                        </tr>
+                                    ))}
+                                </tbody>
+                                {isOverall && (
+                                    <tfoot className="bg-slate-50/50 border-t-2 border-slate-100">
+                                        <tr>
+                                            <td className="py-5 px-8 text-left uppercase text-green-800 font-black text-[11px]">MoM %</td>
+                                            <td className="py-5 px-4 text-right"><ChangeBadge val={summaryTotals.mom.spend} /></td>
+                                            <td className="py-5 px-4 text-right"><ChangeBadge val={summaryTotals.mom.regs} /></td>
+                                            <td className="py-5 px-4 text-right"><ChangeBadge val={summaryTotals.mom.mncs} /></td>
+                                            <td className="py-5 px-4 text-center"><ChangeBadge val={summaryTotals.mom.cvr} /></td>
+                                            <td className="py-5 px-4 text-center"><ChangeBadge val={summaryTotals.mom.cpa} inverse /></td>
+                                            <td className="py-5 px-4 text-center"><ChangeBadge val={summaryTotals.mom.ltv} /></td>
+                                            <td className="py-5 px-4 text-right pr-10"><ChangeBadge val={summaryTotals.mom.payback} inverse /></td>
+                                        </tr>
+                                        <tr>
+                                            <td className="py-5 px-8 text-left uppercase text-green-800 font-black text-[11px]">YoY %</td>
+                                            <td className="py-5 px-4 text-right border-t border-slate-100/50"><ChangeBadge val={summaryTotals.yoy.spend} /></td>
+                                            <td className="py-5 px-4 text-right border-t border-slate-100/50"><ChangeBadge val={summaryTotals.yoy.regs} /></td>
+                                            <td className="py-5 px-4 text-right border-t border-slate-100/50"><ChangeBadge val={summaryTotals.yoy.mncs} /></td>
+                                            <td className="py-5 px-4 text-center border-t border-slate-100/50"><ChangeBadge val={summaryTotals.yoy.cvr} /></td>
+                                            <td className="py-5 px-4 text-center border-t border-slate-100/50"><ChangeBadge val={summaryTotals.yoy.cpa} inverse /></td>
+                                            <td className="py-5 px-4 text-center border-t border-slate-100/50"><ChangeBadge val={summaryTotals.yoy.ltv} /></td>
+                                            <td className="py-5 px-4 text-right pr-10 border-t border-slate-100/50"><ChangeBadge val={summaryTotals.yoy.payback} inverse /></td>
+                                        </tr>
+                                    </tfoot>
+                                )}
+                            </table>
+                        </div>
+
                         {(isOverall || region === 'GLOBAL') && (
                             <div className="flex flex-col space-y-12 pt-8 border-t border-slate-100">
                                 <div className="narrative-block space-y-6">
@@ -387,7 +447,7 @@
 
             const getRoadmapFallback = (region) => `Maintain regional performance in ${region} and optimize cost-per-acquisition.`;
 
-            const handleIntelligenceSync = async () => {
+            const handleIntelligenceSync = async (type) => {
                 setIsSyncing(true);
                 try {
                     const regionalInputs = REGIONS.map(r => {
@@ -399,13 +459,28 @@
                         return `--- REGION: ${r} ---\nNARRATIVE: ${narrative}\nPLANS: ${roadmap}`;
                     }).filter(Boolean).join('\n\n');
 
+                    if (!regionalInputs) {
+                        setIsSyncing(false);
+                        return;
+                    }
+
                     const systemPrompt = "Analyze regional inputs and synthesize them into a Global dossier. Format: 'Main Highlights / Performance Influencers:' followed by bullets for each region, then 'Major Plans for Next Month' followed by regional summaries. Highlight CVR shifts and specific test results.";
                     const result = await callGemini(regionalInputs, systemPrompt, userKey);
                     
                     const sections = result.split(/Major Plans for Next Month/i);
-                    setComments(prev => ({...prev, [`GLOBAL_${selectedMonth}_Overall`]: sections[0].trim()}));
-                    setRoadmaps(prev => ({...prev, [`GLOBAL_${selectedMonth}_Overall`]: `Major Plans for Next Month\n\n${sections[1]?.trim() || ""}`}));
-                } catch (err) { console.error(err); } finally { setIsSyncing(false); }
+                    const narrativeRes = sections[0].trim();
+                    const roadmapRes = `Major Plans for Next Month\n\n${sections[1]?.trim() || ""}`;
+
+                    if (type === 'comments') {
+                        setComments(prev => ({...prev, [`GLOBAL_${selectedMonth}_Overall`]: narrativeRes}));
+                    } else {
+                        setRoadmaps(prev => ({...prev, [`GLOBAL_${selectedMonth}_Overall`]: roadmapRes}));
+                    }
+                } catch (err) { 
+                    console.error("Sync Error:", err); 
+                } finally { 
+                    setIsSyncing(false); 
+                }
             };
 
             const getRegionData = (region, month) => {
