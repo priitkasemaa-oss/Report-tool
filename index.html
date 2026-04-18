@@ -16,47 +16,25 @@
         /* Advanced Print Layout & Grouping */
         @media print {
             @page { 
-                margin: 10mm; /* Strict 10mm margin on all sides */
+                margin: 10mm; 
             }
             .no-print { display: none !important; }
             body { background: white !important; padding: 0 !important; margin: 0 !important; }
             .max-w-5xl { max-width: 100% !important; padding: 0 !important; width: 100% !important; margin: 0 !important; }
             
-            /* Remove manual paddings to ensure all pages start at the same height (exactly at the 10mm margin) */
-            .page-top-margin {
-                padding-top: 0 !important;
-                margin-top: 0 !important;
-            }
-
-            /* Each new region section starts on a fresh page at the same height */
-            .region-section { 
+            .region-section, .platform-page-break, .force-break-before {
                 page-break-before: always !important;
                 break-before: page !important;
-                padding-top: 0 !important;
+                padding-top: 20px !important; 
                 margin-top: 0 !important;
             }
+            
             .region-section:first-of-type {
                 page-break-before: avoid !important;
                 break-before: avoid !important;
-            }
-
-            /* Force Platform sections onto new pages at the same height */
-            .platform-page-break {
-                page-break-before: always !important;
-                break-before: page !important;
                 padding-top: 0 !important;
-                margin-top: 0 !important;
             }
 
-            /* Internal break for Global Overall dashboard table */
-            .force-break-before {
-                page-break-before: always !important;
-                break-before: page !important;
-                padding-top: 0 !important;
-                margin-top: 0 !important;
-            }
-
-            /* Keep Narrative Blocks Together */
             .narrative-block {
                 page-break-inside: avoid !important;
                 break-inside: avoid !important;
@@ -67,6 +45,7 @@
             thead { display: table-header-group !important; }
             
             .shadow-2xl, .shadow-xl, .shadow-sm { box-shadow: none !important; border: 1px solid #f1f5f9 !important; }
+            .ring-4 { ring: 0 !important; border: 1px solid #e2e8f0 !important; }
         }
 
         .animate-in { animation: fadeIn 0.8s ease-out; }
@@ -80,71 +59,28 @@
     <script type="text/babel">
         const { useState, useMemo, useEffect, useRef } = React;
 
-        // --- ICONS ---
-        const Icon = ({ d, size = 20, className = "" }) => (
-            <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}>
-                <path d={d} />
-            </svg>
-        );
+        // --- GLOBAL CONSTANTS & UTILS ---
+        const REGIONS = ['NORTHAM', 'LATAM', 'ASIA', 'PACIFIC', 'GBR', 'EUROPE', 'MEA'];
+        const PLATFORMS_LIST = ['Overall', 'Google AC', 'TTD', 'Moloco'];
+        const MONTH_NAMES = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
 
-        const Icons = {
-            Upload: (p) => <Icon d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M17 8l-5-5-5 5M12 3v12" {...p} />,
-            Chart: (p) => <Icon d="M12 20V10M18 20V4M6 20v-4" {...p} />,
-            Download: (p) => <Icon d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M7 10l5 5 5-5M12 15V3" {...p} />,
-            ChevronRight: (p) => <Icon d="m9 18 6-6-6-6" {...p} />,
-            X: (p) => <Icon d="M18 6 6 18M6 6l12 12" {...p} />,
-            Message: (p) => <Icon d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" {...p} />,
-            Map: (p) => <Icon d="M3 6l6-3 6 3 6-3v15l-6 3-6-3-6 3V6zm6-3v15m6-15v15" {...p} />,
-            Sparkles: (p) => <Icon d="m12 3 1.912 5.813a2 2 0 0 0 1.275 1.275L21 12l-5.813 1.912a2 2 0 0 0-1.275 1.275L12 21l-1.912-5.813a2 2 0 0 0-1.275-1.275L3 12l5.813-1.912a2 2 0 0 0 1.275-1.275L12 3Z" {...p} />
-        };
-
-        // --- COMPONENTS ---
-        const AutoExpandingTextarea = ({ value, onChange, placeholder, className }) => {
-            const textareaRef = useRef(null);
-            useEffect(() => {
-                if (textareaRef.current) {
-                    textareaRef.current.style.height = 'auto';
-                    textareaRef.current.style.height = textareaRef.current.scrollHeight + 'px';
-                }
-            }, [value]);
-            return (
-                <textarea
-                    ref={textareaRef}
-                    value={value}
-                    onChange={onChange}
-                    placeholder={placeholder}
-                    className={`w-full overflow-hidden resize-none transition-all duration-200 focus:ring-0 focus:outline-none ${className}`}
-                />
-            );
-        };
-
-        const ChangeBadge = ({ val, inverse = false }) => {
-            if (val === null || !isFinite(val) || val === 0) return <span className="text-slate-300 text-[10px] font-black uppercase tracking-widest">-</span>;
-            const isPos = val >= 0;
-            const good = inverse ? !isPos : isPos;
-            return (
-                <span className={`inline-flex items-center px-3 py-1 rounded-full text-[10px] font-black leading-none ${good ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}`}>
-                    {isPos ? '+' : ''}{(val * 100).toFixed(0)}%
-                </span>
-            );
-        };
-
-        const formatAccurateCurrency = (v) => {
-            return new Intl.NumberFormat('en-GB', { style: 'currency', currency: 'GBP', minimumFractionDigits: 2 }).format(v);
-        };
-
-        // --- UTILS ---
         const safeParseNum = (val) => {
+            if (typeof val === 'number') return val;
             const cleaned = String(val || '0').replace(/[^\d.-]/g, '');
             const num = parseFloat(cleaned);
             return isNaN(num) ? 0 : num;
         };
 
-        const monthNames = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
         const getMonthName = (dateStr) => {
             if (!dateStr) return "";
-            const m = parseInt(dateStr.split('-')[1]);
-            return monthNames[m-1] || "";
+            const parts = dateStr.split('-');
+            if (parts.length < 2) return "";
+            const m = parseInt(parts[1]);
+            return MONTH_NAMES[m-1] || "";
+        };
+
+        const formatAccurateCurrency = (v) => {
+            return new Intl.NumberFormat('en-GB', { style: 'currency', currency: 'GBP', minimumFractionDigits: 2 }).format(v);
         };
 
         function parseCSV(text) {
@@ -186,25 +122,83 @@
             });
         }
 
-        const REGIONS = ['NORTHAM', 'LATAM', 'ASIA', 'PACIFIC', 'GBR', 'EUROPE', 'MEA'];
+        // --- ICONS ---
+        const Icon = ({ d, size = 20, className = "" }) => (
+            <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}>
+                <path d={d} />
+            </svg>
+        );
 
-        // --- DASHBOARD COMPONENT ---
-        const PlatformDashboard = ({ region, title, dashboard, formatCurrency, formatNumber, isGlobal, onNarrativeChange, onRoadmapSync, commentary, roadmap, isOverall = false }) => {
+        const Icons = {
+            Upload: (p) => <Icon d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M17 8l-5-5-5 5M12 3v12" {...p} />,
+            Chart: (p) => <Icon d="M12 20V10M18 20V4M6 20v-4" {...p} />,
+            Download: (p) => <Icon d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M7 10l5 5 5-5M12 15V3" {...p} />,
+            ChevronRight: (p) => <Icon d="m9 18 6-6-6-6" {...p} />,
+            X: (p) => <Icon d="M18 6 6 18M6 6l12 12" {...p} />,
+            Message: (p) => <Icon d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" {...p} />,
+            Map: (p) => <Icon d="M3 6l6-3 6 3 6-3v15l-6 3-6-3-6 3V6zm6-3v15m6-15v15" {...p} />,
+            Sparkles: (p) => <Icon d="m12 3 1.912 5.813a2 2 0 0 0 1.275 1.275L21 12l-5.813 1.912a2 2 0 0 0-1.275 1.275L12 21l-1.912-5.813a2 2 0 0 0-1.275-1.275L3 12l5.813-1.912a2 2 0 0 0 1.275-1.275L12 3Z" {...p} />,
+            Refresh: (p) => <Icon d="M21 2v6h-6M3 12a9 9 0 0 1 15-6.7L21 8M3 22v-6h6M21 12a9 9 0 0 1-15 6.7L3 16" {...p} />
+        };
+
+        // --- COMPONENTS ---
+        const AutoExpandingTextarea = ({ value, onChange, placeholder, className }) => {
+            const textareaRef = useRef(null);
+            useEffect(() => {
+                if (textareaRef.current) {
+                    textareaRef.current.style.height = 'auto';
+                    textareaRef.current.style.height = textareaRef.current.scrollHeight + 'px';
+                }
+            }, [value]);
+            return (
+                <textarea
+                    ref={textareaRef}
+                    value={value}
+                    onChange={onChange}
+                    placeholder={placeholder}
+                    className={`w-full overflow-hidden resize-none transition-all duration-200 focus:ring-0 focus:outline-none ${className}`}
+                />
+            );
+        };
+
+        const ChangeBadge = ({ val, inverse = false }) => {
+            if (val === null || !isFinite(val) || val === 0) return <span className="text-slate-300 text-[10px] font-black uppercase tracking-widest">-</span>;
+            const isPos = val >= 0;
+            const good = inverse ? !isPos : isPos;
+            return (
+                <span className={`inline-flex items-center px-3 py-1 rounded-full text-[10px] font-black leading-none whitespace-nowrap ${good ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}`}>
+                    {isPos ? '+' : ''}{(val * 100).toFixed(0)}%
+                </span>
+            );
+        };
+
+        const PlatformDashboard = ({ region, title, dashboard, formatNumber, isGlobal, onNarrativeChange, onRoadmapSync, onSyncFromRegions, commentary, roadmap, isOverall = false }) => {
             if (!dashboard || dashboard.trend.length === 0) return null;
             const { trend, contributionList, summaryTotals } = dashboard;
             
             const svgWidth = 1000, svgHeight = 500; 
             const pL = 80, pR = 80, pY = 60, cW = svgWidth - pL - pR, cH = svgHeight - pY * 2;
-            
-            const maxMnc = Math.max(...trend.map(d => d.mncs), 1) * 1.35;
-            const maxPb = Math.max(...trend.map(d => d.payback), 1, 20) * 1.35;
-            const maxSpend = Math.max(...trend.map(d => d.spend), 1) * 1.35;
-            const maxLtv = Math.max(...trend.map(d => d.ltv), 1) * 1.35;
 
-            const step = trend.length > 1 ? cW / (trend.length - 1) : 0;
-            const getY = (val, max) => pY + cH - ((val / max) * cH);
-            const getX = (i) => pL + i * step;
-            const buildPath = (pts) => pts.map((p, i) => `${i === 0 ? 'M' : 'L'} ${p.x} ${p.y}`).join(' ');
+            const getRange = (key) => {
+                const vals = trend.map(d => d[key]);
+                const min = Math.min(...vals);
+                const max = Math.max(...vals);
+                return { min, max, diff: max - min || 1 };
+            };
+
+            const sRange = getRange('spend');
+            const pbRange = getRange('payback');
+            const ltvRange = getRange('ltv');
+            const maxMnc = Math.max(...trend.map(d => d.mncs), 1);
+
+            const getLaneY = (val, rangeObj, bottomPct, topPct) => {
+                const laneHeight = (topPct - bottomPct) / 100;
+                const relativePos = (val - rangeObj.min) / rangeObj.diff;
+                const totalPct = (bottomPct / 100) + (relativePos * laneHeight);
+                return pY + cH - (totalPct * cH);
+            };
+
+            const getX = (i) => pL + i * (trend.length > 1 ? cW / (trend.length - 1) : 0);
 
             return (
                 <div className={`bg-white rounded-[2.5rem] shadow-2xl border border-slate-100 flex flex-col mb-12 overflow-visible page-top-margin ${isOverall ? 'border-indigo-100 ring-4 ring-indigo-50/50' : 'platform-page-break'}`}>
@@ -217,142 +211,156 @@
                     </div>
                     
                     <div className="p-10 space-y-10">
-                        {/* CHART UNIT */}
                         <div className="space-y-6">
                             <div className="w-full bg-white overflow-visible border-b border-slate-50 pb-8">
                                 <svg viewBox={`0 0 ${svgWidth} ${svgHeight}`} className="w-full h-auto overflow-visible block">
                                     <defs>
                                         <filter id="halo" x="-50%" y="-50%" width="200%" height="200%">
-                                            <feFlood floodColor="white" result="bg" /><feMorphology in="SourceAlpha" operator="dilate" radius="1.2" result="dilated" />
-                                            <feComposite in="bg" in2="dilated" operator="in" result="outline" /><feMerge><feMergeNode in="outline" /><feMergeNode in="SourceGraphic" /></feMerge>
+                                            <feFlood floodColor="white" result="bg" />
+                                            <feMorphology in="SourceAlpha" operator="dilate" radius="1.2" result="dilated" />
+                                            <feComposite in="bg" in2="dilated" operator="in" result="outline" />
+                                            <feMerge><feMergeNode in="outline" /><feMergeNode in="SourceGraphic" /></feMerge>
                                         </filter>
                                     </defs>
                                     {[0, 0.25, 0.5, 0.75, 1].map(r => <line key={r} x1={pL} y1={pY + cH * r} x2={svgWidth - pR} y2={pY + cH * r} stroke="#f1f5f9" strokeWidth="1" />)}
                                     
-                                    <path d={buildPath(trend.map((d,i)=>({x:getX(i), y:getY(d.spend, maxSpend)})))} fill="none" stroke="#ef4444" strokeWidth="3" opacity="0.4" />
-                                    <path d={buildPath(trend.map((d,i)=>({x:getX(i), y:getY(d.ltv, maxLtv)})))} fill="none" stroke="#10b981" strokeWidth="2.5" strokeDasharray="6 4" opacity="0.4" />
-                                    <path d={buildPath(trend.map((d,i)=>({x:getX(i), y:getY(d.payback, maxPb)})))} fill="none" stroke="#f59e0b" strokeWidth="4" />
+                                    <path d={trend.map((d,i)=>`${i===0?'M':'L'} ${getX(i)} ${getLaneY(d.spend, sRange, 60, 82)}`).join(' ')} fill="none" stroke="#ef4444" strokeWidth="3" opacity="0.3" />
+                                    <path d={trend.map((d,i)=>`${i===0?'M':'L'} ${getX(i)} ${getLaneY(d.ltv, ltvRange, 88, 100)}`).join(' ')} fill="none" stroke="#10b981" strokeWidth="2.5" strokeDasharray="6 4" opacity="0.3" />
+                                    <path d={trend.map((d,i)=>`${i===0?'M':'L'} ${getX(i)} ${getLaneY(d.payback, pbRange, 35, 60)}`).join(' ')} fill="none" stroke="#f59e0b" strokeWidth="4" />
 
                                     {trend.map((d, i) => {
                                         const x = getX(i);
-                                        const mncH = (d.mncs / maxMnc) * cH;
-                                        const labels = [
-                                            { id: 's', val: `£${Math.round(d.spend/1000)}k`, y: getY(d.spend, maxSpend), color: '#ef4444' },
-                                            { id: 'pb', val: `${d.payback.toFixed(1)}m`, y: getY(d.payback, maxPb), color: '#f59e0b' },
-                                            { id: 'ltv', val: `£${Math.round(d.ltv)}`, y: getY(d.ltv, maxLtv), color: '#10b981' }
+                                        const mncH = (d.mncs / maxMnc) * (cH * 0.45); 
+                                        
+                                        let stack = [
+                                            { id: 'mnc', val: d.mncs.toLocaleString(), y: pY + cH - mncH - 12, color: '#6366f1', type: 'text' },
+                                            { id: 's', val: `£${Math.round(d.spend/1000)}k`, y: getLaneY(d.spend, sRange, 60, 82), color: '#ef4444', type: 'pill' },
+                                            { id: 'pb', val: `${d.payback.toFixed(1)}m`, y: getLaneY(d.payback, pbRange, 35, 60), color: '#f59e0b', type: 'pill' },
+                                            { id: 'ltv', val: `£${Math.round(d.ltv)}`, y: getLaneY(d.ltv, ltvRange, 88, 100), color: '#10b981', type: 'pill' }
                                         ].sort((a, b) => a.y - b.y);
 
-                                        if (labels[1].y - labels[0].y < 24) labels[1].y = labels[0].y + 24;
-                                        if (labels[2].y - labels[1].y < 24) labels[2].y = labels[1].y + 24;
+                                        for (let k = 1; k < stack.length; k++) {
+                                            if (stack[k].y - stack[k-1].y < 44) {
+                                                stack[k].y = stack[k-1].y + 44;
+                                            }
+                                        }
 
                                         return (
                                             <g key={i}>
                                                 <rect x={x - 15} y={pY + cH - mncH} width={30} height={mncH} fill="#6366f1" fillOpacity={d.spend > 0 ? 0.8 : 0.1} rx={4} />
-                                                {d.spend > 0 && labels.map(lbl => (
+                                                
+                                                {d.mncs > 0 && stack.map(lbl => (
                                                     <g key={lbl.id}>
-                                                        <rect x={x - 20} y={lbl.y - 30} width={40} height={18} rx={9} fill="white" stroke={lbl.color} strokeWidth="1.2" />
-                                                        <text x={x} y={lbl.y - 18} textAnchor="middle" fill={lbl.color} fontSize="9" fontWeight="900" filter="url(#halo)">{lbl.val}</text>
+                                                        {lbl.type === 'pill' ? (
+                                                            <g>
+                                                                <rect x={x - 32} y={lbl.y - 34} width={64} height={24} rx={12} fill="white" stroke={lbl.color} strokeWidth="2.5" />
+                                                                <text x={x} y={lbl.y - 17} textAnchor="middle" fill={lbl.color} fontSize="11" font-family="Inter" fontWeight="900">{lbl.val}</text>
+                                                            </g>
+                                                        ) : (
+                                                            <g>
+                                                                <rect x={x - 30} y={lbl.y - 18} width={60} height={22} rx={6} fill="white" fillOpacity="0.85" />
+                                                                <text x={x} y={lbl.y} textAnchor="middle" fill={lbl.color} fontSize="12" font-family="Inter" fontWeight="900" filter="url(#halo)">{lbl.val}</text>
+                                                            </g>
+                                                        )}
                                                     </g>
                                                 ))}
-                                                <circle cx={x} cy={getY(d.payback, maxPb)} r="5" fill="#f59e0b" stroke="white" strokeWidth="2" />
-                                                <text x={x} y={pY + cH + 30} textAnchor="middle" fill="#94a3b8" fontSize="10" fontWeight="bold" transform={`rotate(-35, ${x}, ${pY + cH + 30})`}>{d.month}</text>
+                                                
+                                                <circle cx={x} cy={getLaneY(d.payback, pbRange, 35, 60)} r="7" fill="#f59e0b" stroke="white" strokeWidth="3" />
+                                                <text x={x} y={pY + cH + 30} textAnchor="middle" fill="#94a3b8" fontSize="10" font-family="Inter" fontWeight="bold" transform={`rotate(-35, ${x}, ${pY + cH + 30})`}>{d.month}</text>
                                             </g>
                                         );
                                     })}
                                 </svg>
                             </div>
                             
-                            {/* GRAPH LEGEND */}
-                            <div className="flex flex-wrap items-center justify-center gap-x-8 gap-y-3 px-6 pb-2">
-                                <div className="flex items-center gap-2">
-                                    <div className="w-4 h-1 bg-[#ef4444] rounded-full opacity-60"></div>
-                                    <span className="text-[10px] font-black uppercase text-slate-500 tracking-tight">Investment</span>
-                                </div>
-                                <div className="flex items-center gap-2">
-                                    <div className="w-3 h-3 bg-[#6366f1] rounded-sm opacity-80"></div>
-                                    <span className="text-[10px] font-black uppercase text-slate-500 tracking-tight">MNCs</span>
-                                </div>
-                                <div className="flex items-center gap-2">
-                                    <div className="w-3 h-3 rounded-full border-2 border-[#f59e0b] bg-white"></div>
-                                    <div className="w-4 h-1 bg-[#f59e0b] rounded-full -ml-1"></div>
-                                    <span className="text-[10px] font-black uppercase text-slate-500 tracking-tight">Weighted Payback</span>
-                                </div>
-                                <div className="flex items-center gap-2">
-                                    <div className="w-4 h-1 border-b-2 border-dashed border-[#10b981] opacity-60"></div>
-                                    <span className="text-[10px] font-black uppercase text-slate-500 tracking-tight">LTV</span>
-                                </div>
+                            <div className="flex flex-wrap items-center justify-center gap-x-12 gap-y-3 px-6 pt-3 pb-3 border-t border-slate-50">
+                                <div className="flex items-center gap-3"><div className="w-6 h-1.5 bg-[#ef4444] rounded-full opacity-40"></div><span className="text-[11px] font-black uppercase text-slate-500 tracking-wider">Investment</span></div>
+                                <div className="flex items-center gap-3"><div className="w-3.5 h-3.5 bg-[#6366f1] rounded-sm opacity-80"></div><span className="text-[11px] font-black uppercase text-slate-500 tracking-wider">MNCs</span></div>
+                                <div className="flex items-center gap-3"><div className="w-3.5 h-3.5 rounded-full border-2 border-[#f59e0b] bg-white"></div><div className="w-5 h-1.5 bg-[#f59e0b] rounded-full -ml-1"></div><span className="text-[11px] font-black uppercase text-slate-500 tracking-wider">Weighted Payback</span></div>
+                                <div className="flex items-center gap-3"><div className="w-6 h-1 border-b-2 border-dashed border-[#10b981] opacity-60"></div><span className="text-[11px] font-black uppercase text-slate-500 tracking-wider">LTV</span></div>
                             </div>
                         </div>
 
-                        {/* TABLE */}
                         <div className={`bg-white border border-slate-100 rounded-[2rem] overflow-hidden shadow-sm ${isOverall && region === 'GLOBAL' ? 'force-break-before' : ''}`}>
                             <table className="w-full text-center text-xs border-collapse">
                                 <thead className="bg-[#1a2d1a] border-b text-white font-black uppercase tracking-widest">
                                     <tr>
-                                        <th className="py-5 px-8 text-left">{isOverall ? region : (isGlobal ? 'Region' : 'Market')}</th>
-                                        <th className="py-5 px-4 text-right">Spend</th>
-                                        <th className="py-5 px-4 text-right">Regs</th>
+                                        <th className="py-5 px-8 text-left whitespace-nowrap">{isOverall ? region : (isGlobal ? 'Region' : 'Market')}</th>
+                                        <th className="py-5 px-4 text-right">Investment</th>
+                                        {isOverall && <th className="py-5 px-4 text-right">Regs</th>}
                                         <th className="py-5 px-4 text-right">MNCs</th>
-                                        <th className="py-5 px-4">CVR</th>
+                                        {!isOverall && <th className="py-5 px-4 text-center">MoM%</th>}
+                                        {!isOverall && <th className="py-5 px-4 text-center">YoY%</th>}
+                                        {isOverall && <th className="py-5 px-4">CVR</th>}
                                         <th className="py-5 px-4 text-[#ef4444]">CPA</th>
                                         <th className="py-5 px-4 text-[#10b981]">LTV</th>
-                                        <th className="py-5 px-4 text-right pr-10">Payback</th>
+                                        <th className="py-5 px-4 text-right pr-10">PB</th>
                                     </tr>
                                 </thead>
                                 <tbody className="divide-y divide-slate-50 font-bold">
                                     {contributionList.map((item, i) => (
                                         <tr key={i} className="hover:bg-slate-50/50 transition-colors">
                                             <td className="py-4 px-8 text-left uppercase text-slate-900 font-black">{item.label}</td>
-                                            <td className="py-4 px-4 text-right text-slate-500 font-medium">{formatCurrency(item.spend)}</td>
-                                            <td className="py-4 px-4 text-right text-slate-900 font-black">{formatNumber(item.regs)}</td>
-                                            <td className="py-4 px-4 text-right text-slate-900 font-black">{formatNumber(item.mncs)}</td>
-                                            <td className="py-4 px-4 text-slate-500">{(item.cvr * 100).toFixed(1)}%</td>
+                                            <td className="py-4 px-4 text-right text-slate-500 font-medium">£{item.spend.toLocaleString(undefined, {minimumFractionDigits: 2})}</td>
+                                            {isOverall && <td className="py-4 px-4 text-right text-slate-900 font-black">{item.regs?.toLocaleString()}</td>}
+                                            <td className="py-4 px-4 text-right text-slate-900 font-black">{item.mncs.toLocaleString()}</td>
+                                            {!isOverall && <td className="py-4 px-4 text-center"><ChangeBadge val={item.momChange} /></td>}
+                                            {!isOverall && <td className="py-4 px-4 text-center"><ChangeBadge val={item.yoyChange} /></td>}
+                                            {isOverall && <td className="py-4 px-4 text-slate-500">{((item.mncs / (item.regs || 1)) * 100).toFixed(1)}%</td>}
                                             <td className="py-4 px-4 text-[#ef4444] font-black">£{item.cpa.toFixed(2)}</td>
                                             <td className="py-4 px-4 text-[#10b981]">£{Math.round(item.ltv)}</td>
                                             <td className="py-4 px-4 text-right pr-10 text-slate-900 font-black">{item.payback.toFixed(1)}m</td>
                                         </tr>
                                     ))}
                                 </tbody>
-                                {/* SUMMARY MOM/YOY ROWS */}
-                                <tfoot className="bg-slate-50/50 border-t-2 border-slate-100">
-                                    <tr>
-                                        <td className="py-5 px-8 text-left uppercase text-green-800 font-black text-[11px]">MoM %</td>
-                                        <td className="py-5 px-4 text-right"><ChangeBadge val={summaryTotals.mom.spend} /></td>
-                                        <td className="py-5 px-4 text-right"><ChangeBadge val={summaryTotals.mom.regs} /></td>
-                                        <td className="py-5 px-4 text-right"><ChangeBadge val={summaryTotals.mom.mncs} /></td>
-                                        <td className="py-5 px-4 text-center"><ChangeBadge val={summaryTotals.mom.cvr} /></td>
-                                        <td className="py-5 px-4 text-center"><ChangeBadge val={summaryTotals.mom.cpa} inverse /></td>
-                                        <td className="py-5 px-4 text-center"><ChangeBadge val={summaryTotals.mom.ltv} /></td>
-                                        <td className="py-5 px-4 text-right pr-10"><ChangeBadge val={summaryTotals.mom.payback} inverse /></td>
-                                    </tr>
-                                    <tr>
-                                        <td className="py-5 px-8 text-left uppercase text-green-800 font-black text-[11px]">YoY %</td>
-                                        <td className="py-5 px-4 text-right border-t border-slate-100/50"><ChangeBadge val={summaryTotals.yoy.spend} /></td>
-                                        <td className="py-5 px-4 text-right border-t border-slate-100/50"><ChangeBadge val={summaryTotals.yoy.regs} /></td>
-                                        <td className="py-5 px-4 text-right border-t border-slate-100/50"><ChangeBadge val={summaryTotals.yoy.mncs} /></td>
-                                        <td className="py-5 px-4 text-center border-t border-slate-100/50"><ChangeBadge val={summaryTotals.yoy.cvr} /></td>
-                                        <td className="py-5 px-4 text-center border-t border-slate-100/50"><ChangeBadge val={summaryTotals.yoy.cpa} inverse /></td>
-                                        <td className="py-5 px-4 text-center border-t border-slate-100/50"><ChangeBadge val={summaryTotals.yoy.ltv} /></td>
-                                        <td className="py-5 px-4 text-right pr-10 border-t border-slate-100/50"><ChangeBadge val={summaryTotals.yoy.payback} inverse /></td>
-                                    </tr>
-                                </tfoot>
+                                {isOverall && (
+                                    <tfoot className="bg-slate-50/50 border-t-2 border-slate-100">
+                                        <tr>
+                                            <td className="py-5 px-8 text-left uppercase text-green-800 font-black text-[11px]">MoM %</td>
+                                            <td className="py-5 px-4 text-right"><ChangeBadge val={summaryTotals.mom.spend} /></td>
+                                            <td className="py-5 px-4 text-right"><ChangeBadge val={summaryTotals.mom.regs} /></td>
+                                            <td className="py-5 px-4 text-right"><ChangeBadge val={summaryTotals.mom.mncs} /></td>
+                                            <td className="py-5 px-4 text-center"><ChangeBadge val={summaryTotals.mom.cvr} /></td>
+                                            <td className="py-5 px-4 text-center"><ChangeBadge val={summaryTotals.mom.cpa} inverse /></td>
+                                            <td className="py-5 px-4 text-center"><ChangeBadge val={summaryTotals.mom.ltv} /></td>
+                                            <td className="py-5 px-4 text-right pr-10"><ChangeBadge val={summaryTotals.mom.payback} inverse /></td>
+                                        </tr>
+                                        <tr>
+                                            <td className="py-5 px-8 text-left uppercase text-green-800 font-black text-[11px]">YoY %</td>
+                                            <td className="py-5 px-4 text-right border-t border-slate-100/50"><ChangeBadge val={summaryTotals.yoy.spend} /></td>
+                                            <td className="py-5 px-4 text-right border-t border-slate-100/50"><ChangeBadge val={summaryTotals.yoy.regs} /></td>
+                                            <td className="py-5 px-4 text-right border-t border-slate-100/50"><ChangeBadge val={summaryTotals.yoy.mncs} /></td>
+                                            <td className="py-5 px-4 text-center border-t border-slate-100/50"><ChangeBadge val={summaryTotals.yoy.cvr} /></td>
+                                            <td className="py-5 px-4 text-center border-t border-slate-100/50"><ChangeBadge val={summaryTotals.yoy.cpa} inverse /></td>
+                                            <td className="py-5 px-4 text-center border-t border-slate-100/50"><ChangeBadge val={summaryTotals.yoy.ltv} /></td>
+                                            <td className="py-5 px-4 text-right pr-10 border-t border-slate-100/50"><ChangeBadge val={summaryTotals.yoy.payback} inverse /></td>
+                                        </tr>
+                                    </tfoot>
+                                )}
                             </table>
                         </div>
 
-                        {/* NARRATIVES */}
                         {(isOverall || region === 'GLOBAL') && (
                             <div className="flex flex-col space-y-10 pt-8 border-t border-slate-100">
                                 <div className="narrative-block space-y-4">
-                                    <div className="flex items-center gap-2 text-[#1a3812]">
-                                       <Icons.Message size={22} />
-                                       <h4 className="font-black text-[13px] uppercase tracking-widest">Strategic Narrative</h4>
+                                    <div className="flex items-center justify-between">
+                                        <div className="flex items-center gap-2 text-[#1a3812]"><Icons.Message size={22} /><h4 className="font-black text-[13px] uppercase tracking-widest">Strategic Narrative</h4></div>
+                                        {region === 'GLOBAL' && isOverall && (
+                                            <button onClick={() => onSyncFromRegions('comments')} className="no-print flex items-center gap-2 px-4 py-2 bg-indigo-50 text-indigo-700 rounded-xl text-[10px] font-black uppercase hover:bg-indigo-100 transition-colors">
+                                                <Icons.Refresh size={14} /> Sync from Regions
+                                            </button>
+                                        )}
                                     </div>
                                     <AutoExpandingTextarea value={commentary || ''} onChange={(e) => onNarrativeChange(title, e.target.value)} className="p-8 bg-slate-50 rounded-[2rem] border border-slate-100 text-slate-800 text-[15px] italic font-medium leading-relaxed shadow-inner" />
                                 </div>
                                 <div className="narrative-block space-y-4">
-                                    <div className="flex items-center gap-2 text-indigo-900">
-                                        <Icons.Map size={22} />
-                                        <h4 className="font-black text-[13px] uppercase tracking-widest">Next month's plans</h4>
+                                    <div className="flex items-center justify-between">
+                                        <div className="flex items-center gap-2 text-indigo-900"><Icons.Map size={22} /><h4 className="font-black text-[13px] uppercase tracking-widest">Next month's plans</h4></div>
+                                        {region === 'GLOBAL' && isOverall && (
+                                            <button onClick={() => onSyncFromRegions('roadmaps')} className="no-print flex items-center gap-2 px-4 py-2 bg-indigo-50 text-indigo-700 rounded-xl text-[10px] font-black uppercase hover:bg-indigo-100 transition-colors">
+                                                <Icons.Refresh size={14} /> Sync from Regions
+                                            </button>
+                                        )}
                                     </div>
                                     <AutoExpandingTextarea value={roadmap || ''} onChange={(e) => onRoadmapSync(title, e.target.value)} className="p-8 bg-indigo-50/20 rounded-[2rem] border border-indigo-100/50 text-slate-800 text-[15px] font-medium leading-relaxed shadow-inner" placeholder="Enter upcoming tactical optimizations..." />
                                 </div>
@@ -363,14 +371,12 @@
             );
         };
 
-        // --- MAIN APP ---
         function App() {
             const [data, setData] = useState([]);
             const [selectedRegion, setSelectedRegion] = useState('GLOBAL');
             const [selectedMonth, setSelectedMonth] = useState('');
             const [comments, setComments] = useState({});
             const [roadmaps, setRoadmaps] = useState({});
-            const platforms = ['Overall', 'Google AC', 'TTD', 'Moloco'];
 
             const handleFileUpload = (e) => {
                 const file = e.target.files[0];
@@ -392,45 +398,61 @@
                     const sp = safeParseNum(rec.spend), mn = Math.round(safeParseNum(rec.mncs)), regs = Math.round(safeParseNum(rec.regs)), pb = safeParseNum(rec.payback), ltv = safeParseNum(rec.ltv);
                     s += sp; m += mn; r += regs; pWSum += pb * mn; lSum += ltv * mn;
                 });
-                return { 
-                    spend: s, mncs: m, regs: r, 
-                    cpa: m > 0 ? s / m : 0, 
-                    payback: m > 0 ? pWSum / m : 0, 
-                    ltv: m > 0 ? lSum / m : 0,
-                    cvr: r > 0 ? m / r : 0
-                };
+                return { spend: s, mncs: m, regs: r, cpa: m > 0 ? s / m : 0, payback: m > 0 ? pWSum / m : 0, ltv: m > 0 ? lSum / m : 0, cvr: r > 0 ? m / r : 0 };
+            };
+
+            const getDefaultRegionalNarrative = (reg, month) => {
+                const cur = aggregate(data.filter(r => r.region?.toUpperCase() === reg && r.date === month));
+                if (cur.mncs === 0) return "";
+                return `In ${getMonthName(month)}, ${reg} reached ${cur.mncs.toLocaleString()} MNCs at a weighted payback of ${cur.payback.toFixed(1)}m. Efficiency remains within targeted goals.`;
+            };
+
+            const getDefaultRegionalRoadmap = (reg, month) => {
+                return `Maintain regional performance in ${reg} while optimizing CPA efficiency.`;
+            };
+
+            const handleIntelligenceSync = (type) => {
+                const compiled = REGIONS.map(r => {
+                    const key = `${r}_${selectedMonth}_Overall`;
+                    const text = type === 'comments' ? 
+                        (comments[key] || getDefaultRegionalNarrative(r, selectedMonth)) : 
+                        (roadmaps[key] || getDefaultRegionalRoadmap(r, selectedMonth));
+                    return text ? `• ${r}: ${text.split('.')[0]}.` : null; // Get first sentence
+                }).filter(Boolean).join('\n\n');
+                
+                if (type === 'comments') {
+                    setComments(prev => ({...prev, [`GLOBAL_${selectedMonth}_Overall`]: `Global Synthesis for ${getMonthName(selectedMonth)}:\n\n${compiled}`}));
+                } else {
+                    setRoadmaps(prev => ({...prev, [`GLOBAL_${selectedMonth}_Overall`]: `Global Strategy for Next Month:\n\n${compiled}`}));
+                }
             };
 
             const getRegionData = (region, month) => {
+                if (!month) return null;
                 const [y, mNum] = month.split('-').map(Number);
                 const pmS = `${mNum === 1 ? y-1 : y}-${String(mNum === 1 ? 12 : mNum-1).padStart(2, '0')}`;
                 const pyS = `${y-1}-${String(mNum).padStart(2, '0')}`;
-
-                const regionDashboards = platforms.map(p => {
-                    const allDates = [...new Set(data.map(d => d.date))].sort();
-                    const trend = allDates.map(date => {
+                const regionDashboards = PLATFORMS_LIST.map(p => {
+                    const trend = [...new Set(data.map(d => d.date))].sort().map(date => {
                         const match = data.filter(r => (region === 'GLOBAL' || r.region?.toUpperCase() === region) && r.date === date && (p === 'Overall' || r.platform === p));
                         return { month: date, ...aggregate(match) };
                     });
-                    
                     const currentRecords = data.filter(r => (region === 'GLOBAL' || r.region?.toUpperCase() === region) && r.date === month && (p === 'Overall' || r.platform === p));
-                    
                     let contributionList = [];
                     if (p === 'Overall') {
-                        // For Overall Dashboard, show Platform rows
                         contributionList = ['Google AC', 'TTD', 'Moloco'].map(plat => {
                             const f = (r) => (region === 'GLOBAL' || r.region?.toUpperCase() === region) && r.platform === plat;
-                            const curAgg = aggregate(data.filter(r => f(r) && r.date === month));
-                            return { label: plat, ...curAgg };
+                            return { label: plat, ...aggregate(data.filter(r => f(r) && r.date === month)) };
                         }).filter(item => item.spend > 0 || item.mncs > 0);
                     } else {
-                        // For Platform Dashboard, show Market/Region rows
                         const uniqueLabels = [...new Set(currentRecords.map(r => region === 'GLOBAL' ? r.region : r.country))].filter(l => l && l !== "" && l.toLowerCase() !== "unknown");
                         const tempContributionList = uniqueLabels.map(label => {
                             const f = (r) => (region === 'GLOBAL' ? r.region : r.country) === label && r.platform === p;
-                            return { label, ...aggregate(data.filter(r => f(r) && r.date === month)) };
+                            const cur = aggregate(data.filter(r => f(r) && r.date === month));
+                            const pm = aggregate(data.filter(r => f(r) && r.date === pmS));
+                            const py = aggregate(data.filter(r => f(r) && r.date === pyS));
+                            return { label, ...cur, momChange: pm.mncs ? (cur.mncs-pm.mncs)/pm.mncs : 0, yoyChange: py.mncs ? (cur.mncs-py.mncs)/py.mncs : 0 };
                         }).filter(item => item.spend > 0 || item.mncs > 0);
-
                         const activeMarkets = tempContributionList.filter(item => item.spend > 0);
                         const noSpendMarkets = tempContributionList.filter(item => item.spend === 0 && item.mncs > 0);
                         contributionList = [...activeMarkets].sort((a,b) => b.spend - a.spend);
@@ -439,51 +461,21 @@
                             contributionList.push({ label: restLabel, ...aggregate(noSpendMarkets) });
                         }
                     }
-
-                    // Calculation of Footer Summary Totals for MoM/YoY
-                    const curTotal = aggregate(data.filter(r => (region === 'GLOBAL' || r.region?.toUpperCase() === region) && r.date === month && (p === 'Overall' || r.platform === p)));
-                    const pmTotal = aggregate(data.filter(r => (region === 'GLOBAL' || r.region?.toUpperCase() === region) && r.date === pmS && (p === 'Overall' || r.platform === p)));
-                    const pyTotal = aggregate(data.filter(r => (region === 'GLOBAL' || r.region?.toUpperCase() === region) && r.date === pyS && (p === 'Overall' || r.platform === p)));
-                    
-                    const calcPct = (c, p) => p > 0 ? (c - p) / p : 0;
-                    const summaryTotals = {
-                        mom: {
-                            spend: calcPct(curTotal.spend, pmTotal.spend),
-                            regs: calcPct(curTotal.regs, pmTotal.regs),
-                            mncs: calcPct(curTotal.mncs, pmTotal.mncs),
-                            cvr: calcPct(curTotal.cvr, pmTotal.cvr),
-                            cpa: calcPct(curTotal.cpa, pmTotal.cpa),
-                            ltv: calcPct(curTotal.ltv, pmTotal.ltv),
-                            payback: calcPct(curTotal.payback, pmTotal.payback)
-                        },
-                        yoy: {
-                            spend: calcPct(curTotal.spend, pyTotal.spend),
-                            regs: calcPct(curTotal.regs, pyTotal.regs),
-                            mncs: calcPct(curTotal.mncs, pyTotal.mncs),
-                            cvr: calcPct(curTotal.cvr, pyTotal.cvr),
-                            cpa: calcPct(curTotal.cpa, pyTotal.cpa),
-                            ltv: calcPct(curTotal.ltv, pyTotal.ltv),
-                            payback: calcPct(curTotal.payback, pyTotal.payback)
-                        }
-                    };
-                    
-                    return { title: p, trend, contributionList, summaryTotals };
+                    const curT = aggregate(data.filter(r => (region === 'GLOBAL' || r.region?.toUpperCase() === region) && r.date === month && (p === 'Overall' || r.platform === p)));
+                    const pmT = aggregate(data.filter(r => (region === 'GLOBAL' || r.region?.toUpperCase() === region) && r.date === pmS && (p === 'Overall' || r.platform === p)));
+                    const pyT = aggregate(data.filter(r => (region === 'GLOBAL' || r.region?.toUpperCase() === region) && r.date === pyS && (p === 'Overall' || r.platform === p)));
+                    const calcPct = (c, pVal) => pVal > 0 ? (c - pVal) / pVal : 0;
+                    return { title: p, trend, contributionList, summaryTotals: { mom: { spend: calcPct(curT.spend, pmT.spend), regs: calcPct(curT.regs, pmT.regs), mncs: calcPct(curT.mncs, pmT.mncs), cvr: calcPct(curT.cvr, pmT.cvr), cpa: calcPct(curT.cpa, pmT.cpa), ltv: calcPct(curT.ltv, pmT.ltv), payback: calcPct(curT.payback, pmT.payback) }, yoy: { spend: calcPct(curT.spend, pyT.spend), regs: calcPct(curT.regs, pyT.regs), mncs: calcPct(curT.mncs, pyT.mncs), cvr: calcPct(curT.cvr, pyT.cvr), cpa: calcPct(curT.cpa, pyT.cpa), ltv: calcPct(curT.ltv, pyT.ltv), payback: calcPct(curT.payback, pyT.payback) } } };
                 });
-
-                const curStats = aggregate(data.filter(r => (region === 'GLOBAL' || r.region?.toUpperCase() === region) && r.date === month));
-                const pmStats = aggregate(data.filter(r => (region === 'GLOBAL' || r.region?.toUpperCase() === region) && r.date === pmS));
-                
-                return {
-                    region,
-                    stats: { cur: curStats, mom: { s: pmStats.spend ? (curStats.spend-pmStats.spend)/pmStats.spend : 0, m: pmStats.mncs ? (curStats.mncs-pmStats.mncs)/pmStats.mncs : 0, p: pmStats.payback ? (curStats.payback-pmStats.payback)/pmStats.payback : 0 } },
-                    dashboards: regionDashboards
-                };
+                const curS = aggregate(data.filter(r => (region === 'GLOBAL' || r.region?.toUpperCase() === region) && r.date === month));
+                const pmS2 = aggregate(data.filter(r => (region === 'GLOBAL' || r.region?.toUpperCase() === region) && r.date === pmS));
+                return { region, stats: { cur: curS, mom: { s: pmS2.spend ? (curS.spend-pmS2.spend)/pmS2.spend : 0, m: pmS2.mncs ? (curS.mncs-pmS2.mncs)/pmS2.mncs : 0, p: pmS2.payback ? (curS.payback-pmS2.payback)/pmS2.payback : 0 } }, dashboards: regionDashboards };
             };
 
             const fullReport = useMemo(() => {
                 if (!data.length || !selectedMonth) return [];
                 const regionsToProcess = selectedRegion === 'GLOBAL' ? ['GLOBAL', ...REGIONS] : [selectedRegion];
-                return regionsToProcess.map(r => getRegionData(r, selectedMonth));
+                return regionsToProcess.map(r => getRegionData(r, selectedMonth)).filter(Boolean);
             }, [data, selectedRegion, selectedMonth]);
 
             const getNarrative = (region, p, dash) => {
@@ -491,172 +483,28 @@
                 if (comments[key]) return comments[key];
                 const cur = dash.trend.find(t => t.month === selectedMonth);
                 if (!cur || cur.mncs === 0) return "";
-                
-                const [y, mNum] = selectedMonth.split('-').map(Number);
-                const pmS = `${mNum === 1 ? y-1 : y}-${String(mNum === 1 ? 12 : mNum-1).padStart(2, '0')}`;
-                const prevM = dash.trend.find(t => t.month === pmS);
-                const growth = prevM && prevM.mncs > 0 ? ((cur.mncs-prevM.mncs)/prevM.mncs*100).toFixed(0) : 0;
-                const pbGrowth = prevM && prevM.payback > 0 ? ((cur.payback-prevM.payback)/prevM.payback*100).toFixed(0) : 0;
-                const topContributor = dash.contributionList[0];
-                const monthName = getMonthName(selectedMonth);
-
                 if (p === 'Overall' && region === 'GLOBAL') {
-                    const gacAgg = aggregate(data.filter(r => r.date === selectedMonth && r.platform === 'Google AC'));
-                    const ttdAgg = aggregate(data.filter(r => r.date === selectedMonth && r.platform === 'TTD'));
-                    const topEfficiency = [...dash.contributionList].filter(i=>i.spend>0).sort((a,b) => a.payback - b.payback)[0];
-
-                    return `Overall:
-In ${monthName}, we drove ${cur.mncs.toLocaleString()} MNCs (${growth >= 0 ? '+' : ''}${growth}% MoM) on £${Math.round(cur.spend).toLocaleString()} spend, resulting in a payback of ${cur.payback.toFixed(1)}m (${pbGrowth >= 0 ? '+' : ''}${pbGrowth}% MoM).
-The majority of MNCs came from: ${topContributor?.label} (${topContributor?.mncs.toLocaleString()}). ${topEfficiency?.label || "N/A"} led in efficiency with a ${topEfficiency?.payback.toFixed(1)}m payback. ${ttdAgg.mncs > gacAgg.mncs ? 'TTD' : 'GAC'} was the largest contributor to MNC volume (${ttdAgg.mncs.toLocaleString()} vs. ${gacAgg.mncs.toLocaleString()} from ${ttdAgg.mncs > gacAgg.mncs ? 'GAC' : 'TTD'}).
-
-Main Highlights / Performance Influencers: 
-• LATAM: Performance stable, partially offset by a strong LTV improvement.
-• NORTHAM: Tracked at strong efficiency, demonstrating robust market resilience.
-• EUROPE: Optimizations implemented to improve cost-per-incremental-signup.
-• ASIA: Significant growth led by adjustments to Purchase optimization.
-• PACIFIC: Achieving initial metrics with focus on efficiency optimization.
-• GBR: Activity adjustments running to improve overall CPA.`;
+                    return `Enter Global Synthesis here or use the Sync button to compile regional reports...`;
                 }
-
-                if (p !== 'Overall') {
-                    return `Platform/Vendor:
-In ${monthName}, ${p} drove ${cur.mncs.toLocaleString()} MNCs at a ${cur.payback.toFixed(1)}m payback.
-Top MNC contributors: ${dash.contributionList.slice(0, 3).map(c => c.label).join(' > ')}.
-Overall performance is ${cur.payback <= 15 ? 'efficient' : 'tracking above goal'}, ${cur.payback <= 15 ? 'tracking under' : 'currently exceeding'} the 15m goal. ${topContributor?.label} showed strong performance with a ${topContributor?.payback.toFixed(1)}m payback.`;
-                }
-
-                return `Strategic Narrative for ${region}:
-In ${monthName}, ${region} generated ${cur.mncs.toLocaleString()} total MNCs (${growth >= 0 ? '+' : ''}${growth}% MoM) at a weighted payback of ${cur.payback.toFixed(1)}m. ${topContributor?.label} stands as the primary growth driver for the region. Strategic focus remains on optimizing efficiency within high-velocity market segments and scaling BAU activity where payback tracking remains under the 15m goal.`;
+                if (p !== 'Overall') return `Platform analysis for ${p} in ${region} regarding ${getMonthName(selectedMonth)} performance goals.`;
+                return `Strategic Narrative for ${region}: In ${getMonthName(selectedMonth)}, ${region} reached ${cur.mncs.toLocaleString()} MNCs at a weighted payback of ${cur.payback.toFixed(1)}m.`;
             };
 
             const getRoadmap = (region, p) => {
                 const key = `${region}_${selectedMonth}_${p}`;
                 if (roadmaps[key]) return roadmaps[key];
-                
-                if (region === 'GLOBAL' && p === 'Overall') {
-                    return `Major Plans for Next Month
-
-LATAM: Maintain performance while conducting incrementality tests.
-NORTHAM: USA conversion lift test and Creative Engine test.
-EUROPE: Increase BAU spend for core non-MMM countries.
-ASIA: Test English Purchase Campaign in BAU activity.
-PACIFIC: Continue running GAC iOS testing in AUS.
-GBR: Switch back to registration optimised activity.`;
-                }
-
-                if (p !== 'Overall') {
-                    return `Strategic Optimization Plans for ${p} in ${region}:
-• Adjust bidding strategy to favor segments currently tracking under the 15m payback goal.
-• Audit creative performance and refresh low-CVR assets to improve CPA efficiency.
-• Evaluate incrementality results to calibrate vendor-level spend attribution for ${getMonthName(selectedMonth)}.`;
-                }
-
-                const plans = {
-                    'LATAM': 'Maintain performance while conducting incrementality tests to build certainty for GAC activity.',
-                    'NORTHAM': 'USA conversion lift test and Creative Engine test.',
-                    'EUROPE': 'Increase BAU spend for 4 non-MMM countries (Spain, Netherlands, Hungary, Finland).',
-                    'ASIA': 'Test English Purchase Campaign in BAU activity and monitor/optimise iOS testing in Japan.',
-                    'PACIFIC': 'Continue running the GAC iOS test in AUS and implement tracked calibrated registrations.',
-                    'GBR': 'Switch back to registration optimised activity to improve incrementality results.',
-                    'MEA': 'Monitor efficiency and explore BAU scaling opportunities in high-potential markets.'
-                };
-
-                return `Major Plans for ${region} next month:
-• ${plans[region] || 'Maintain regional performance while optimizing cost-per-acquisition and payback efficiency across BAU campaigns.'}
-• Review and optimize creative assets for core high-velocity market segments.
-• Conduct strategic testing to improve incremental performance results.`;
+                return `Major Plans for ${region} next month: Maintain performance goals and optimize cost-per-acquisition.`;
             };
 
             return (
                 <div className="min-h-screen bg-[#f8fafc] pb-32">
                     <nav className="w-full bg-[#1a3812] p-8 flex items-center justify-between no-print shadow-2xl border-b-[8px] border-green-900/20">
-                        <div className="flex items-center space-x-4">
-                            <div className="bg-white/10 p-2 rounded-xl"><Icons.Chart size={28} className="text-green-400" /></div>
-                            <h1 className="text-2xl font-black text-white uppercase italic tracking-tighter leading-none">Monthly report tool</h1>
-                        </div>
-                        <div className="flex gap-4">
-                            {!data.length ? (
-                                <label className="px-10 py-4 bg-green-600 text-white rounded-2xl font-black uppercase text-xs cursor-pointer shadow-lg hover:bg-green-500">
-                                    <Icons.Upload size={20} className="mr-3 inline" /> Connect Data
-                                    <input type="file" accept=".csv" className="hidden" onChange={handleFileUpload} />
-                                </label>
-                            ) : (
-                                <div className="flex gap-4">
-                                    <div className="flex bg-white/10 p-1 rounded-2xl border border-white/10">
-                                        <select value={selectedMonth} onChange={e => setSelectedMonth(e.target.value)} className="bg-transparent text-white font-bold px-4 py-2 text-xs">
-                                            {[...new Set(data.map(d => d.date))].sort().reverse().map(d => <option key={d} value={d} className="text-black">{d}</option>)}
-                                        </select>
-                                        <select value={selectedRegion} onChange={e => setSelectedRegion(e.target.value)} className="bg-transparent text-white font-bold px-4 py-2 text-xs border-l border-white/10">
-                                            <option value="GLOBAL" className="text-black">GLOBAL (Full Report)</option>
-                                            {REGIONS.map(r => <option key={r} value={r} className="text-black">{r}</option>)}
-                                        </select>
-                                    </div>
-                                    <button onClick={() => window.print()} className="bg-white px-8 py-4 rounded-2xl font-black text-[#1a3812] text-xs uppercase shadow-lg hover:bg-green-50">Export PDF</button>
-                                    <button onClick={() => setData([])} className="bg-red-500/20 p-4 rounded-2xl text-red-100"><Icons.X /></button>
-                                </div>
-                            )}
-                        </div>
+                        <div className="flex items-center space-x-4"><div className="bg-white/10 p-2 rounded-xl"><Icons.Chart size={28} className="text-green-400" /></div><h1 className="text-2xl font-black text-white uppercase italic tracking-tighter leading-none">Monthly report tool</h1></div>
+                        <div className="flex gap-4">{!data.length ? (<label className="px-10 py-4 bg-green-600 text-white rounded-2xl font-black uppercase text-xs cursor-pointer hover:bg-green-50 shadow-lg transition-all"><Icons.Upload size={20} className="mr-3 inline" /> Connect Data<input type="file" accept=".csv" className="hidden" onChange={handleFileUpload} /></label>) : (<div className="flex gap-4"><div className="flex bg-white/10 p-1 rounded-2xl border border-white/10"><select value={selectedMonth} onChange={e => setSelectedMonth(e.target.value)} className="bg-transparent text-white font-bold px-4 py-2 outline-none text-xs">{[...new Set(data.map(d => d.date))].sort().reverse().map(d => <option key={d} value={d} className="text-black">{d}</option>)}</select><select value={selectedRegion} onChange={e => setSelectedRegion(e.target.value)} className="bg-transparent text-white font-bold px-4 py-2 outline-none text-xs border-l border-white/10"><option value="GLOBAL" className="text-black">GLOBAL (Full Report)</option>{REGIONS.map(r => <option key={r} value={r} className="text-black">{r}</option>)}</select></div><button onClick={() => window.print()} className="bg-white text-[#1a3812] px-8 py-4 rounded-2xl font-black text-xs uppercase shadow-lg hover:bg-green-50">Export PDF</button><button onClick={() => setData([])} className="bg-red-500/20 p-4 rounded-2xl text-red-100 hover:bg-red-600 transition-colors"><Icons.X size={20} /></button></div>)}</div>
                     </nav>
-
                     <div className="max-w-5xl mx-auto p-12">
-                        {fullReport.length > 0 ? (
-                            <div className="space-y-32">
-                                {fullReport.map((rData, rIdx) => (
-                                    <div key={rData.region} className={`space-y-16 ${rIdx > 0 ? 'region-section' : ''} animate-in`}>
-                                        <header className="border-l-[12px] border-green-600 pl-12 py-6 mb-20">
-                                            <h2 className="text-8xl font-black text-slate-900 tracking-tighter uppercase leading-none">
-                                                {rData.region} <span className="text-green-600 block">{selectedMonth}</span>
-                                            </h2>
-                                            <p className="text-slate-400 font-black uppercase tracking-[0.6em] mt-12 text-[11px]">
-                                                {rData.region === 'GLOBAL' ? 'Enterprise Synthesis Dossier' : `Performance Intelligence: ${rData.region}`}
-                                            </p>
-                                        </header>
-
-                                        <div className="grid grid-cols-1 md:grid-cols-3 gap-8 kpi-grid">
-                                            {[
-                                                { l: 'Total Investment', v: new Intl.NumberFormat('en-GB', { style: 'currency', currency: 'GBP', maximumFractionDigits: 0 }).format(rData.stats.cur.spend), ch: rData.stats.mom.s, inv: false },
-                                                { l: 'Growth (MNCs)', v: new Intl.NumberFormat('en-US').format(rData.stats.cur.mncs), ch: rData.stats.mom.m, inv: false },
-                                                { l: 'Weighted Payback', v: `${rData.stats.cur.payback.toFixed(1)}m`, ch: rData.stats.mom.p, inv: true },
-                                            ].map((k, i) => (
-                                                <div key={i} className="bg-white rounded-[3rem] p-12 border shadow-xl flex flex-col justify-between hover:scale-105 transition-transform">
-                                                    <div className="flex justify-between items-start mb-10">
-                                                        <span className="text-[11px] font-black text-slate-400 uppercase tracking-widest">{k.l}</span>
-                                                        <ChangeBadge val={k.ch} inverse={k.inv} />
-                                                    </div>
-                                                    <span className="text-5xl font-black text-slate-900 tracking-tighter leading-none">{k.v}</span>
-                                                </div>
-                                            ))}
-                                        </div>
-
-                                        {rData.dashboards.map(dash => (
-                                            <PlatformDashboard 
-                                                key={dash.title} 
-                                                region={rData.region}
-                                                title={dash.title} 
-                                                dashboard={dash} 
-                                                isOverall={dash.title === 'Overall'} 
-                                                formatCurrency={formatAccurateCurrency} 
-                                                formatNumber={v => v.toLocaleString()} 
-                                                isGlobal={rData.region === 'GLOBAL'} 
-                                                onNarrativeChange={(p, t) => setComments(prev => ({ ...prev, [`${rData.region}_${selectedMonth}_${p}`]: t }))} 
-                                                onRoadmapSync={(p, t) => setRoadmaps(prev => ({ ...prev, [`${rData.region}_${selectedMonth}_${p}`]: t }))} 
-                                                commentary={getNarrative(rData.region, dash.title, dash)} 
-                                                roadmap={getRoadmap(rData.region, dash.title)} 
-                                            />
-                                        ))}
-                                    </div>
-                                ))}
-                            </div>
-                        ) : (
-                            <div className="flex flex-col items-center justify-center min-h-[60vh] text-center bg-white p-24 rounded-[5rem] shadow-2xl border border-slate-100">
-                                <Icons.Chart size={100} className="text-green-600 mx-auto mb-10 transform -rotate-12" />
-                                <h3 className="text-6xl font-black text-slate-900 tracking-tighter mb-6 uppercase leading-none">Intelligence Hub</h3>
-                                <p className="text-slate-400 font-bold mb-12 text-2xl">Connect your CSV source to begin automated synthesis.</p>
-                                <label className="inline-flex items-center px-16 py-8 bg-[#1a3812] text-white rounded-[2.5rem] font-black uppercase cursor-pointer hover:scale-105 transition-all shadow-2xl">
-                                    <Icons.Upload size={24} className="mr-4" /> Select Market Data
-                                    <input type="file" accept=".csv" className="hidden" onChange={handleFileUpload} />
-                                </label>
-                            </div>
+                        {fullReport.length > 0 ? (<div className="space-y-32">{fullReport.map((rData, rIdx) => (<div key={rData.region} className={`space-y-16 ${rIdx > 0 ? 'region-section' : ''} animate-in`}><header className="border-l-[12px] border-green-600 pl-12 py-6 mb-20"><h2 className="text-8xl font-black text-slate-900 tracking-tighter uppercase leading-none">{rData.region} <span className="text-green-600 block">{selectedMonth}</span></h2><p className="text-slate-400 font-black uppercase tracking-[0.6em] mt-12 text-[11px]">{rData.region === 'GLOBAL' ? 'Enterprise Synthesis Dossier' : `Performance Intelligence: ${rData.region}`}</p></header><div className="grid grid-cols-1 md:grid-cols-3 gap-8 kpi-grid">{[{ l: 'Total Investment', v: new Intl.NumberFormat('en-GB', { style: 'currency', currency: 'GBP', maximumFractionDigits: 0 }).format(rData.stats.cur.spend), ch: rData.stats.mom.spend, inv: false }, { l: 'Growth (MNCs)', v: new Intl.NumberFormat('en-US').format(rData.stats.cur.mncs), ch: rData.stats.mom.mncs, inv: false }, { l: 'Weighted Payback', v: `${rData.stats.cur.payback.toFixed(1)}m`, ch: rData.stats.mom.payback, inv: true }].map((k, i) => (<div key={i} className="bg-white rounded-[3rem] p-12 border shadow-xl flex flex-col justify-between hover:scale-105 transition-transform"><div className="flex justify-between items-start mb-10"><span className="text-[11px] font-black text-slate-400 uppercase tracking-widest">{k.l}</span><ChangeBadge val={k.ch} inverse={k.inv} /></div><span className="text-5xl font-black text-slate-900 tracking-tighter leading-none">{k.v}</span></div>))}</div>{rData.dashboards.map(dash => (<PlatformDashboard key={dash.title} region={rData.region} title={dash.title} dashboard={dash} isOverall={dash.title === 'Overall'} formatNumber={v => v.toLocaleString()} isGlobal={rData.region === 'GLOBAL'} onNarrativeChange={(p, t) => setComments(prev => ({ ...prev, [`${rData.region}_${selectedMonth}_${p}`]: t }))} onRoadmapSync={(p, t) => setRoadmaps(prev => ({ ...prev, [`${rData.region}_${selectedMonth}_${p}`]: t }))} onSyncFromRegions={handleIntelligenceSync} commentary={getNarrative(rData.region, dash.title, dash)} roadmap={getRoadmap(rData.region, dash.title)} />))}</div>))}</div>) : (
+                            <div className="flex flex-col items-center justify-center min-h-[60vh] text-center bg-white p-24 rounded-[5rem] shadow-2xl border border-slate-100"><Icons.Chart size={100} className="text-green-600 mx-auto mb-10 transform -rotate-12" /><h3 className="text-6xl font-black text-slate-900 tracking-tighter mb-6 uppercase leading-none">Intelligence Hub</h3><p className="text-slate-400 font-bold mb-12 text-2xl">Connect your CSV source to begin automated synthesis.</p><label className="inline-flex items-center px-16 py-8 bg-[#1a3812] text-white rounded-[2.5rem] font-black uppercase cursor-pointer hover:scale-105 transition-all shadow-2xl"><Icons.Upload size={24} className="mr-4" /> Select Market Data<input type="file" accept=".csv" className="hidden" onChange={handleFileUpload} /></label></div>
                         )}
                     </div>
                 </div>
