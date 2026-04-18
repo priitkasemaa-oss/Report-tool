@@ -274,8 +274,8 @@
                             </table>
                         </div>
 
-                        {/* NARRATIVES: Only show on the "Overall" summary dashboard for that region */}
-                        {isOverall && (
+                        {/* NARRATIVES: Show if it's the Overall dashboard OR if it's the GLOBAL view (vendor-based overviews) */}
+                        {(isOverall || isGlobal) && (
                             <div className="flex flex-col space-y-10 pt-8 border-t border-slate-100">
                                 <div className="space-y-4">
                                     <div className="flex items-center gap-2 text-[#1a3812]">
@@ -407,7 +407,7 @@
                 const topContributor = dash.contributionList[0];
                 const monthName = getMonthName(selectedMonth);
 
-                if (region === 'GLOBAL') {
+                if (p === 'Overall' && region === 'GLOBAL') {
                     const gacAgg = aggregate(data.filter(r => r.date === selectedMonth && r.platform === 'Google AC'));
                     const ttdAgg = aggregate(data.filter(r => r.date === selectedMonth && r.platform === 'TTD'));
                     const topEfficiency = [...dash.contributionList].filter(i=>i.spend>0).sort((a,b) => a.payback - b.payback)[0];
@@ -425,6 +425,13 @@ Main Highlights / Performance Influencers:
 • GBR: Activity adjustments running to improve overall CPA.`;
                 }
 
+                if (p !== 'Overall') {
+                    return `Platform/Vendor:
+In ${monthName}, ${p} drove ${cur.mncs.toLocaleString()} MNCs at a ${cur.payback.toFixed(1)}m payback.
+Top MNC contributors: ${dash.contributionList.slice(0, 3).map(c => c.label).join(' > ')}.
+Overall performance is ${cur.payback <= 15 ? 'efficient' : 'tracking above goal'}, ${cur.payback <= 15 ? 'tracking under' : 'currently exceeding'} the 15m goal. ${topContributor?.label} showed strong performance with a ${topContributor?.payback.toFixed(1)}m payback.`;
+                }
+
                 // Region-specific narrative
                 return `Strategic Narrative for ${region}:
 In ${monthName}, ${region} generated ${cur.mncs.toLocaleString()} total MNCs (${growth >= 0 ? '+' : ''}${growth}% MoM) at a weighted payback of ${cur.payback.toFixed(1)}m. ${topContributor?.label} stands as the primary growth driver for the region. Strategic focus remains on optimizing efficiency within high-velocity market segments and scaling BAU activity where payback tracking remains under the 15m goal.`;
@@ -434,7 +441,7 @@ In ${monthName}, ${region} generated ${cur.mncs.toLocaleString()} total MNCs (${
                 const key = `${region}_${selectedMonth}_${p}`;
                 if (roadmaps[key]) return roadmaps[key];
                 
-                if (region === 'GLOBAL') {
+                if (region === 'GLOBAL' && p === 'Overall') {
                     return `Major Plans for Next Month
 
 LATAM: Maintain performance while conducting incrementality tests.
@@ -443,6 +450,13 @@ EUROPE: Increase BAU spend for core non-MMM countries.
 ASIA: Test English Purchase Campaign in BAU activity.
 PACIFIC: Continue running GAC iOS testing in AUS.
 GBR: Switch back to registration optimised activity.`;
+                }
+
+                if (p !== 'Overall') {
+                    return `Strategic Optimization Plans for ${p} in ${region}:
+• Adjust bidding strategy to favor segments currently tracking under the 15m payback goal.
+• Audit creative performance and refresh low-CVR assets to improve CPA efficiency.
+• Evaluate incrementality results to calibrate vendor-level spend attribution for ${getMonthName(selectedMonth)}.`;
                 }
 
                 // Region-specific roadmap
