@@ -12,10 +12,28 @@
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;700;900&display=swap');
         body { font-family: 'Inter', sans-serif; -webkit-print-color-adjust: exact; }
-        @media print { .no-print { display: none !important; } body { background: white !important; } .max-w-5xl { max-width: 100% !important; padding: 0 !important; width: 100% !important; } }
+        
+        /* Print-specific optimizations to avoid weird cuts */
+        @media print {
+            .no-print { display: none !important; }
+            body { background: white !important; padding: 0 !important; margin: 0 !important; }
+            .max-w-5xl { max-width: 100% !important; padding: 0 !important; width: 100% !important; margin: 0 !important; }
+            .page-break-inside-avoid { 
+                page-break-inside: avoid !important; 
+                break-inside: avoid-page !important;
+                margin-bottom: 2rem !important;
+            }
+            tr { 
+                page-break-inside: avoid !important; 
+                break-inside: avoid !important; 
+            }
+            thead { display: table-header-group !important; } /* Repeats header if table splits */
+            .shadow-2xl, .shadow-xl, .shadow-sm { box-shadow: none !important; border: 1px solid #e2e8f0 !important; }
+            textarea { border: none !important; background: transparent !important; }
+        }
+
         .animate-in { animation: fadeIn 0.8s ease-out; }
         @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
-        /* Hide scrollbars for the auto-expanding textareas */
         textarea::-webkit-scrollbar { width: 0px; background: transparent; }
     </style>
 </head>
@@ -144,6 +162,7 @@
             const step = trend.length > 1 ? cW / (trend.length - 1) : 0;
             const getY = (val, max) => pY + cH - ((val / max) * cH);
             const getX = (i) => pL + i * step;
+
             const buildPath = (pts) => pts.map((p, i) => `${i === 0 ? 'M' : 'L'} ${p.x} ${p.y}`).join(' ');
 
             return (
@@ -157,8 +176,8 @@
                     </div>
                     
                     <div className="p-10 space-y-12">
-                        {/* GRAPH */}
-                        <div className="w-full bg-white overflow-visible border-b border-slate-50 pb-8">
+                        {/* GRAPH SECTION */}
+                        <div className="w-full bg-white overflow-visible border-b border-slate-50 pb-8 page-break-inside-avoid">
                             <svg viewBox={`0 0 ${svgWidth} ${svgHeight}`} className="w-full h-auto overflow-visible block">
                                 <defs>
                                     <filter id="halo" x="-50%" y="-50%" width="200%" height="200%">
@@ -186,7 +205,7 @@
 
                                     return (
                                         <g key={i}>
-                                            <rect x={x - 15} y={pY + cH - mncH} width={30} height={mncH} fill={isOverall ? "#6366f1" : "#6366f1"} fillOpacity={d.spend > 0 ? 0.8 : 0.1} rx={4} />
+                                            <rect x={x - 15} y={pY + cH - mncH} width={30} height={mncH} fill="#6366f1" fillOpacity={d.spend > 0 ? 0.8 : 0.1} rx={4} />
                                             {d.spend > 0 && labels.map(lbl => (
                                                 <g key={lbl.id}>
                                                     <rect x={x - 20} y={lbl.y - 30} width={40} height={18} rx={9} fill="white" stroke={lbl.color} strokeWidth="1.2" />
@@ -201,9 +220,9 @@
                             </svg>
                         </div>
 
-                        {/* MATRIX */}
-                        <div className="bg-white border border-slate-100 rounded-[2rem] overflow-hidden shadow-sm">
-                            <table className="w-full text-center text-xs">
+                        {/* MATRIX TABLE */}
+                        <div className="bg-white border border-slate-100 rounded-[2rem] overflow-hidden shadow-sm page-break-inside-avoid">
+                            <table className="w-full text-center text-xs border-collapse">
                                 <thead className="bg-slate-50 border-b text-slate-400 font-black uppercase tracking-widest">
                                     <tr>
                                         <th className="py-5 px-8 text-left">{isGlobal ? 'Region' : 'Market'}</th>
@@ -218,9 +237,9 @@
                                 </thead>
                                 <tbody className="divide-y divide-slate-50 font-bold">
                                     {contributionList.map((item, i) => (
-                                        <tr key={i} className="hover:bg-slate-50/50">
+                                        <tr key={i} className="hover:bg-slate-50/50 transition-colors">
                                             <td className="py-4 px-8 text-left uppercase text-slate-900 font-black">{item.label}</td>
-                                            <td className="py-4 px-4 text-right text-slate-500">{formatCurrency(item.spend)}</td>
+                                            <td className="py-4 px-4 text-right text-slate-500 font-medium">{formatCurrency(item.spend)}</td>
                                             <td className="py-4 px-4 text-right text-slate-900 font-black">{formatNumber(item.mncs)}</td>
                                             <td className="py-4 px-4"><ChangeBadge val={item.momChange} /></td>
                                             <td className="py-4 px-4"><ChangeBadge val={item.yoyChange} /></td>
@@ -233,8 +252,8 @@
                             </table>
                         </div>
 
-                        {/* VERTICAL NARRATIVES */}
-                        <div className="flex flex-col space-y-10 pt-8 border-t border-slate-100">
+                        {/* NARRATIVE SECTIONS */}
+                        <div className="flex flex-col space-y-10 pt-8 border-t border-slate-100 page-break-inside-avoid">
                             <div className="space-y-4">
                                 <div className="flex items-center gap-2 text-[#1a3812]">
                                    <Icons.Message size={22} />
@@ -255,7 +274,7 @@
             );
         };
 
-        // --- APP ---
+        // --- MAIN APP ---
         function App() {
             const [data, setData] = useState([]);
             const [selectedRegion, setSelectedRegion] = useState('GLOBAL');
@@ -437,7 +456,7 @@ GBR: Switch back to registration optimised activity to improve incrementality re
                         ) : (
                             <div className="flex flex-col items-center justify-center min-h-[60vh] text-center bg-white p-24 rounded-[5rem] shadow-2xl border border-slate-100">
                                 <Icons.Chart size={100} className="text-green-600 mx-auto mb-10 transform -rotate-12" />
-                                <h3 className="text-6xl font-black text-slate-900 tracking-tighter mb-6 uppercase">Intelligence Hub</h3>
+                                <h3 className="text-6xl font-black text-slate-900 tracking-tighter mb-6 uppercase leading-none">Intelligence Hub</h3>
                                 <p className="text-slate-400 font-bold mb-12 text-2xl">Connect your CSV source to begin automated synthesis.</p>
                                 <label className="inline-flex items-center px-16 py-8 bg-[#1a3812] text-white rounded-[2.5rem] font-black uppercase cursor-pointer hover:scale-105 transition-all shadow-2xl">
                                     <Icons.Upload size={24} className="mr-4" /> Select Market Data
