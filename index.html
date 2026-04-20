@@ -260,12 +260,14 @@
                                     {trend.map((d, i) => {
                                         const x = getX(i);
                                         const mncH = (d.mncs / maxMnc) * (cH * 0.45); 
+                                        
+                                        // Conditional logic: If spend is 0, don't show Spend/Payback labels
                                         let stack = [
                                             { id: 'mnc', val: d.mncs.toLocaleString(), y: pY + cH - mncH - 12, color: '#6366f1' },
-                                            { id: 'spend', val: `£${Math.round(d.spend/1000)}k`, y: getLaneY(d.spend, sRange, 60, 82), color: '#ef4444' },
-                                            { id: 'pb', val: `${d.payback.toFixed(1)}m`, y: getLaneY(d.payback, pbRange, 35, 60), color: '#f59e0b' },
+                                            d.spend > 0 ? { id: 'spend', val: `£${Math.round(d.spend/1000)}k`, y: getLaneY(d.spend, sRange, 60, 82), color: '#ef4444' } : null,
+                                            d.spend > 0 ? { id: 'pb', val: `${d.payback.toFixed(1)}m`, y: getLaneY(d.payback, pbRange, 35, 60), color: '#f59e0b' } : null,
                                             { id: 'ltv', val: `£${Math.round(d.ltv)}`, y: getLaneY(d.ltv, ltvRange, 88, 100), color: '#10b981' }
-                                        ].sort((a, b) => a.y - b.y);
+                                        ].filter(Boolean).sort((a, b) => a.y - b.y);
                                         
                                         for (let k = 1; k < stack.length; k++) if (stack[k].y - stack[k-1].y < 46) stack[k].y = stack[k-1].y + 46;
                                         
@@ -284,8 +286,8 @@
                                     })}
                                 </svg>
                             </div>
-                            {/* GRAPH LEGEND Restoration */}
-                            <div className="flex flex-wrap items-center justify-center gap-x-8 gap-y-2 px-6 pt-4 border-t border-slate-50 no-print">
+                            {/* GRAPH LEGEND - Visible in print */}
+                            <div className="flex flex-wrap items-center justify-center gap-x-8 gap-y-2 px-6 pt-4 border-t border-slate-50">
                                 <div className="flex items-center gap-2"><div className="w-4 h-1 bg-[#ef4444] opacity-40"></div><span className="text-[10px] font-black uppercase text-slate-400 tracking-widest">Investment</span></div>
                                 <div className="flex items-center gap-2"><div className="w-3 h-3 bg-[#6366f1] rounded-sm"></div><span className="text-[10px] font-black uppercase text-slate-400 tracking-widest">MNC Volume</span></div>
                                 <div className="flex items-center gap-2"><div className="w-4 h-1 bg-[#f59e0b]"></div><span className="text-[10px] font-black uppercase text-slate-400 tracking-widest">Payback (m)</span></div>
@@ -505,7 +507,7 @@
                         
                         const summaryTotals = {
                             mom: { spend: calcShift(curTotal.spend, pmTotal.spend), regs: calcShift(curTotal.regs, pmTotal.regs), mncs: calcShift(curTotal.mncs, pmTotal.mncs), cvr: calcShift(curTotal.cvr, pmTotal.cvr), cpa: calcShift(curTotal.cpa, pmTotal.cpa), ltv: calcShift(curTotal.ltv, pmTotal.ltv), payback: calcShift(curTotal.payback, pmTotal.payback) },
-                            yoy: { spend: calcShift(curTotal.spend, pyTotal.spend), regs: calcShift(curTotal.regs, pyTotal.regs), mncs: calcShift(curTotal.mncs, pyTotal.mncs), cvr: calcShift(curTotal.cvr, pyTotal.cvr), cpa: calcShift(curTotal.cpa, pyTotal.cpa), ltv: calcShift(curTotal.ltv, pyTotal.ltv), payback: calcShift(curTotal.payback, pyTotal.payback) }
+                            yoy: { spend: calcShift(curTotal.spend, pyTotal.spend), regs: calcShift(curTotal.regs, pyTotal.regs), mncs: calcShift(curTotal.mncs, pyTotal.mncs), cvr: calcShift(curTotal.cvr, pyTotal.cvr), cpa: calcShift(curTotal.cpa, pmTotal.cpa), ltv: calcShift(curTotal.ltv, pyTotal.ltv), payback: calcShift(curTotal.payback, pyTotal.payback) }
                         };
 
                         return { title: p, trend, contributionList: activeMarkets, summaryTotals };
@@ -580,11 +582,12 @@
                                         <p className="text-slate-400 font-black uppercase tracking-[0.6em] mt-8 text-[11px]">Performance Intelligence Dossier</p>
                                     </header>
 
+                                    {/* Responsive KPI Cards: reduced text size to prevent overflow */}
                                     <div className="grid grid-cols-1 md:grid-cols-3 gap-8 mb-16">
                                         {[{ l: 'Total Investment', v: formatAccurateCurrency(rData.stats.cur.spend), ch: rData.stats.mom.spend, inv: false }, { l: 'Growth (MNCs)', v: rData.stats.cur.mncs.toLocaleString(), ch: rData.stats.mom.mncs, inv: false }, { l: 'Weighted Payback', v: `${rData.stats.cur.payback.toFixed(1)}m`, ch: rData.stats.mom.payback, inv: true }].map((k, i) => (
-                                            <div key={i} className="bg-white rounded-[3rem] p-12 border shadow-xl flex flex-col justify-between">
-                                                <div className="flex justify-between items-start mb-10"><span className="text-[11px] font-black text-slate-400 uppercase tracking-widest">{k.l}</span><ChangeBadge val={k.ch} inverse={k.inv} /></div>
-                                                <span className="text-5xl font-black text-slate-900 tracking-tighter leading-none">{k.v}</span>
+                                            <div key={i} className="bg-white rounded-[3rem] p-10 border shadow-xl flex flex-col justify-between overflow-hidden">
+                                                <div className="flex justify-between items-start mb-8"><span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">{k.l}</span><ChangeBadge val={k.ch} inverse={k.inv} /></div>
+                                                <span className="text-4xl font-black text-slate-900 tracking-tighter leading-none break-all">{k.v}</span>
                                             </div>
                                         ))}
                                     </div>
