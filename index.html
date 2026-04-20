@@ -13,14 +13,14 @@
         @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;700;900&display=swap');
         body { font-family: 'Inter', sans-serif; -webkit-print-color-adjust: exact; }
         
-        /* Advanced Print Layout & Grouping */
+        /* Advanced Print Layout & Grouping - Based on 114.pdf logic */
         @media print {
             @page { margin: 10mm; }
             .no-print { display: none !important; }
             body { background: white !important; padding: 0 !important; margin: 0 !important; }
             .max-w-5xl { max-width: 100% !important; padding: 0 !important; width: 100% !important; margin: 0 !important; }
             
-            /* Tightened layout for the first page */
+            /* Each Region (e.g. GLOBAL, NORTHAM) starts a new page */
             .region-section {
                 page-break-before: always !important;
                 break-before: page !important;
@@ -32,17 +32,22 @@
                 padding-top: 0 !important; 
             }
             
-            /* Allow first dashboard to stay on page 1 with KPIs */
-            .first-dashboard {
-                page-break-before: avoid !important;
-                margin-top: 0 !important;
+            /* Chart blocks and Table blocks are separated to match PDF sequence */
+            .chart-page-block {
+                page-break-after: always !important;
+                break-after: page !important;
+            }
+            
+            .table-narrative-block {
+                page-break-after: always !important;
+                break-after: page !important;
             }
 
-            .narrative-block { page-break-inside: avoid !important; break-inside: avoid !important; display: block !important; }
-            tr { page-break-inside: avoid !important; break-inside: avoid !important; }
-            thead { display: table-header-group !important; }
+            /* Final cleaning */
             .shadow-2xl, .shadow-xl, .shadow-sm { box-shadow: none !important; border: 1px solid #f1f5f9 !important; }
             .ring-4 { ring: 0 !important; border: 1px solid #e2e8f0 !important; }
+            tr { page-break-inside: avoid !important; break-inside: avoid !important; }
+            thead { display: table-header-group !important; }
         }
 
         .animate-in { animation: fadeIn 0.8s ease-out; }
@@ -193,7 +198,7 @@
             );
         };
 
-        const PlatformDashboard = ({ region, month, title, dashboard, isGlobal, isOverall, onNarrativeChange, onRoadmapSync, onSyncFromRegions, commentary, roadmap, isSyncing, isFirst }) => {
+        const PlatformDashboard = ({ region, month, title, dashboard, isGlobal, isOverall, onNarrativeChange, onRoadmapSync, onSyncFromRegions, commentary, roadmap, isSyncing }) => {
             if (!dashboard || !dashboard.trend || dashboard.trend.length === 0) return null;
             const { trend, contributionList, summaryTotals } = dashboard;
             
@@ -231,62 +236,66 @@
             }, [trend, month, contributionList, isOverall, title]);
 
             return (
-                <div className={`bg-white rounded-[2.5rem] shadow-2xl border border-slate-100 flex flex-col mb-12 overflow-visible ${isFirst ? 'first-dashboard' : 'platform-page-break'}`}>
-                    <div className={`${isOverall ? 'bg-indigo-900' : 'bg-[#1a3812]'} px-10 py-6 border-b border-slate-200 flex justify-between items-center rounded-t-[2.5rem]`}>
-                        <h3 className="text-2xl font-black text-white uppercase tracking-tighter">{title}</h3>
-                        <span className="text-[10px] text-white/40 font-black uppercase tracking-[0.4em]">{isGlobal ? 'Regional Synthesis' : 'Market Analysis'}</span>
+                <div className="platform-unit mb-12">
+                    {/* CHART BLOCK - One per Page */}
+                    <div className="bg-white rounded-[2.5rem] shadow-2xl border border-slate-100 flex flex-col overflow-visible chart-page-block">
+                        <div className={`${isOverall ? 'bg-indigo-900' : 'bg-[#1a3812]'} px-10 py-6 border-b border-slate-200 flex justify-between items-center rounded-t-[2.5rem]`}>
+                            <h3 className="text-2xl font-black text-white uppercase tracking-tighter">{title}</h3>
+                            <span className="text-[10px] text-white/40 font-black uppercase tracking-[0.4em]">{isGlobal ? 'Regional Synthesis' : 'Market Analysis'}</span>
+                        </div>
+                        <div className="p-10">
+                            <div className="w-full bg-white overflow-visible pb-4 border-b border-slate-50">
+                                <svg viewBox={`0 0 ${svgWidth} ${svgHeight}`} className="w-full h-auto overflow-visible block">
+                                    <defs>
+                                        <filter id="halo" x="-50%" y="-50%" width="200%" height="200%">
+                                            <feFlood floodColor="white" result="bg" /><feMorphology in="SourceAlpha" operator="dilate" radius="1.2" result="dilated" /><feComposite in="bg" in2="dilated" operator="in" result="outline" /><feMerge><feMergeNode in="outline" /><feMergeNode in="SourceGraphic" /></feMerge>
+                                        </filter>
+                                    </defs>
+                                    {[0, 0.25, 0.5, 0.75, 1].map(r => <line key={r} x1={pL} y1={pY + cH * r} x2={svgWidth - pR} y2={pY + cH * r} stroke="#f1f5f9" strokeWidth="1" />)}
+                                    
+                                    <path d={trend.map((d,i)=>`${i===0?'M':'L'} ${getX(i)} ${getLaneY(d.spend, sRange, 60, 82)}`).join(' ')} fill="none" stroke="#ef4444" strokeWidth="3" opacity="0.3" />
+                                    <path d={trend.map((d,i)=>`${i===0?'M':'L'} ${getX(i)} ${getLaneY(d.ltv, ltvRange, 88, 100)}`).join(' ')} fill="none" stroke="#10b981" strokeWidth="2.5" strokeDasharray="6 4" opacity="0.3" />
+                                    <path d={trend.map((d,i)=>`${i===0?'M':'L'} ${getX(i)} ${getLaneY(d.payback, pbRange, 35, 60)}`).join(' ')} fill="none" stroke="#f59e0b" strokeWidth="4" />
+
+                                    {trend.map((d, i) => {
+                                        const x = getX(i);
+                                        const mncH = (d.mncs / maxMnc) * (cH * 0.45); 
+                                        let stack = [
+                                            { id: 'mnc', val: d.mncs.toLocaleString(), y: pY + cH - mncH - 12, color: '#6366f1' },
+                                            { id: 'spend', val: `£${Math.round(d.spend/1000)}k`, y: getLaneY(d.spend, sRange, 60, 82), color: '#ef4444' },
+                                            { id: 'pb', val: `${d.payback.toFixed(1)}m`, y: getLaneY(d.payback, pbRange, 35, 60), color: '#f59e0b' },
+                                            { id: 'ltv', val: `£${Math.round(d.ltv)}`, y: getLaneY(d.ltv, ltvRange, 88, 100), color: '#10b981' }
+                                        ].sort((a, b) => a.y - b.y);
+                                        
+                                        for (let k = 1; k < stack.length; k++) if (stack[k].y - stack[k-1].y < 46) stack[k].y = stack[k-1].y + 46;
+                                        
+                                        return (
+                                            <g key={i}>
+                                                <rect x={x - 15} y={pY + cH - mncH} width={30} height={mncH} fill="#6366f1" fillOpacity={0.8} rx={4} />
+                                                {stack.map((lbl, idx) => (
+                                                    <g key={idx}>
+                                                        <rect x={x - 34} y={lbl.y - 18} width={68} height={20} rx={10} fill="white" fillOpacity="0.9" stroke={lbl.color} strokeWidth="1" />
+                                                        <text x={x} y={lbl.y - 4} textAnchor="middle" fill={lbl.color} fontSize="10" fontWeight="900" filter="url(#halo)">{lbl.val}</text>
+                                                    </g>
+                                                ))}
+                                                <text x={x} y={pY + cH + 30} textAnchor="middle" fill="#94a3b8" fontSize="10" font-family="Inter" fontWeight="bold" transform={`rotate(-35, ${x}, ${pY + cH + 30})`}>{d.month}</text>
+                                            </g>
+                                        );
+                                    })}
+                                </svg>
+                            </div>
+                            {/* GRAPH LEGEND Restoration */}
+                            <div className="flex flex-wrap items-center justify-center gap-x-8 gap-y-2 px-6 pt-4 border-t border-slate-50 no-print">
+                                <div className="flex items-center gap-2"><div className="w-4 h-1 bg-[#ef4444] opacity-40"></div><span className="text-[10px] font-black uppercase text-slate-400 tracking-widest">Investment</span></div>
+                                <div className="flex items-center gap-2"><div className="w-3 h-3 bg-[#6366f1] rounded-sm"></div><span className="text-[10px] font-black uppercase text-slate-400 tracking-widest">MNC Volume</span></div>
+                                <div className="flex items-center gap-2"><div className="w-4 h-1 bg-[#f59e0b]"></div><span className="text-[10px] font-black uppercase text-slate-400 tracking-widest">Payback (m)</span></div>
+                                <div className="flex items-center gap-2"><div className="w-4 h-0.5 border-b border-dashed border-[#10b981]"></div><span className="text-[10px] font-black uppercase text-slate-400 tracking-widest">LTV (£)</span></div>
+                            </div>
+                        </div>
                     </div>
-                    
-                    <div className="p-10 space-y-10">
-                        <div className="w-full bg-white overflow-visible pb-4 border-b border-slate-50">
-                            <svg viewBox={`0 0 ${svgWidth} ${svgHeight}`} className="w-full h-auto overflow-visible block">
-                                <defs>
-                                    <filter id="halo" x="-50%" y="-50%" width="200%" height="200%">
-                                        <feFlood floodColor="white" result="bg" /><feMorphology in="SourceAlpha" operator="dilate" radius="1.2" result="dilated" /><feComposite in="bg" in2="dilated" operator="in" result="outline" /><feMerge><feMergeNode in="outline" /><feMergeNode in="SourceGraphic" /></feMerge>
-                                    </filter>
-                                </defs>
-                                {[0, 0.25, 0.5, 0.75, 1].map(r => <line key={r} x1={pL} y1={pY + cH * r} x2={svgWidth - pR} y2={pY + cH * r} stroke="#f1f5f9" strokeWidth="1" />)}
-                                
-                                <path d={trend.map((d,i)=>`${i===0?'M':'L'} ${getX(i)} ${getLaneY(d.spend, sRange, 60, 82)}`).join(' ')} fill="none" stroke="#ef4444" strokeWidth="3" opacity="0.3" />
-                                <path d={trend.map((d,i)=>`${i===0?'M':'L'} ${getX(i)} ${getLaneY(d.ltv, ltvRange, 88, 100)}`).join(' ')} fill="none" stroke="#10b981" strokeWidth="2.5" strokeDasharray="6 4" opacity="0.3" />
-                                <path d={trend.map((d,i)=>`${i===0?'M':'L'} ${getX(i)} ${getLaneY(d.payback, pbRange, 35, 60)}`).join(' ')} fill="none" stroke="#f59e0b" strokeWidth="4" />
 
-                                {trend.map((d, i) => {
-                                    const x = getX(i);
-                                    const mncH = (d.mncs / maxMnc) * (cH * 0.45); 
-                                    let stack = [
-                                        { val: d.mncs.toLocaleString(), y: pY + cH - mncH - 12, color: '#6366f1' },
-                                        { val: `£${Math.round(d.spend/1000)}k`, y: getLaneY(d.spend, sRange, 60, 82), color: '#ef4444' },
-                                        { val: `${d.payback.toFixed(1)}m`, y: getLaneY(d.payback, pbRange, 35, 60), color: '#f59e0b' },
-                                        { val: `£${Math.round(d.ltv)}`, y: getLaneY(d.ltv, ltvRange, 88, 100), color: '#10b981' }
-                                    ].sort((a, b) => a.y - b.y);
-                                    
-                                    for (let k = 1; k < stack.length; k++) if (stack[k].y - stack[k-1].y < 46) stack[k].y = stack[k-1].y + 46;
-                                    
-                                    return (
-                                        <g key={i}>
-                                            <rect x={x - 15} y={pY + cH - mncH} width={30} height={mncH} fill="#6366f1" fillOpacity={0.8} rx={4} />
-                                            {stack.map((lbl, idx) => (
-                                                <g key={idx}>
-                                                    <rect x={x - 34} y={lbl.y - 18} width={68} height={20} rx={10} fill="white" fillOpacity="0.9" stroke={lbl.color} strokeWidth="1" />
-                                                    <text x={x} y={lbl.y - 4} textAnchor="middle" fill={lbl.color} fontSize="10" fontWeight="900" filter="url(#halo)">{lbl.val}</text>
-                                                </g>
-                                            ))}
-                                            <text x={x} y={pY + cH + 30} textAnchor="middle" fill="#94a3b8" fontSize="10" font-family="Inter" fontWeight="bold" transform={`rotate(-35, ${x}, ${pY + cH + 30})`}>{d.month}</text>
-                                        </g>
-                                    );
-                                })}
-                            </svg>
-                        </div>
-
-                        {/* GRAPH DEFINITIONS - Legend restored */}
-                        <div className="flex flex-wrap items-center justify-center gap-x-8 gap-y-2 px-6 pt-2 pb-6 border-b border-slate-50 no-print">
-                            <div className="flex items-center gap-2"><div className="w-4 h-1 bg-[#ef4444] opacity-40"></div><span className="text-[10px] font-black uppercase text-slate-400">Investment</span></div>
-                            <div className="flex items-center gap-2"><div className="w-3 h-3 bg-[#6366f1] rounded-sm"></div><span className="text-[10px] font-black uppercase text-slate-400">MNC Volume</span></div>
-                            <div className="flex items-center gap-2"><div className="w-4 h-1 bg-[#f59e0b]"></div><span className="text-[10px] font-black uppercase text-slate-400">Payback (m)</span></div>
-                            <div className="flex items-center gap-2"><div className="w-4 h-0.5 border-b border-dashed border-[#10b981]"></div><span className="text-[10px] font-black uppercase text-slate-400">LTV (£)</span></div>
-                        </div>
-
+                    {/* TABLE & NARRATIVE BLOCK - Next Page */}
+                    <div className="bg-white rounded-[2.5rem] shadow-2xl border border-slate-100 flex flex-col p-10 space-y-10 table-narrative-block">
                         <div className="bg-white border border-slate-100 rounded-[2rem] overflow-hidden shadow-sm">
                             <table className="w-full text-center text-xs border-collapse">
                                 <thead className="bg-[#1a2d1a] border-b text-white font-black uppercase tracking-widest">
@@ -348,7 +357,7 @@
                                     <div className="flex items-center justify-between">
                                         <div className="flex items-center gap-2 text-[#1a3812] font-black uppercase text-xs tracking-widest"><Icons.Message size={18} /> Strategic Narrative</div>
                                         {region === 'GLOBAL' && (
-                                            <button onClick={onSyncFromRegions} disabled={isSyncing} className={`no-print flex items-center gap-2 px-6 py-3 rounded-xl text-[11px] font-black uppercase transition-all shadow-lg ${isSyncing ? 'bg-slate-100 text-slate-400 cursor-not-allowed' : 'bg-indigo-600 text-white hover:bg-indigo-500'}`}>
+                                            <button onClick={onSyncFromRegions} disabled={isSyncing} className={`no-print flex items-center gap-2 px-6 py-3 rounded-xl text-[11px] font-black uppercase transition-all shadow-lg hover:scale-105 active:scale-95 ${isSyncing ? 'bg-slate-100 text-slate-400 cursor-not-allowed' : 'bg-indigo-600 text-white hover:bg-indigo-500'}`}>
                                                 {isSyncing ? <Icons.Loader size={16} /> : <Icons.Zap size={16} />} Intelligence Sync
                                             </button>
                                         )}
@@ -448,12 +457,10 @@
                     const dashboards = PLATFORMS_LIST.map(p => {
                         const matchAllDates = rMatch.filter(d => (p === 'Overall' || d.platform?.includes(p)));
                         const trend = [...new Set(data.map(d => d.date))].sort().map(date => ({ month: date, ...aggregate(matchAllDates.filter(d => d.date === date)) }));
-                        const current = matchAllDates.filter(d => d.date === selectedMonth);
-                        
-                        // Grouping logic for "Rest of Region"
                         const currentRecords = matchAllDates.filter(d => d.date === selectedMonth);
+                        
                         const uniqueMarkets = [...new Set(currentRecords.map(d => r === 'GLOBAL' ? d.region : d.country))]
-                                              .filter(m => m && m.trim() !== ""); // Filter out empty market names
+                                              .filter(m => m && m.trim() !== ""); 
                         
                         let contribs = uniqueMarkets.map(m => {
                             const f = (match) => match.filter(d => (r === 'GLOBAL' ? d.region : d.country) === m);
@@ -513,7 +520,7 @@
                 <div className="min-h-screen pb-32">
                     {/* Modals */}
                     {showKeyModal && (
-                        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
+                        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 no-print">
                             <div className="bg-white rounded-3xl p-8 max-w-md w-full shadow-2xl scale-in duration-200">
                                 <h3 className="text-xl font-black mb-2 uppercase tracking-tight">OpenAI Configuration</h3>
                                 <p className="text-slate-500 text-sm mb-6 leading-relaxed">Enter your ChatGPT API key (sk-...). This tool uses GPT-4o-mini for reliable synthesis.</p>
@@ -527,7 +534,7 @@
                     )}
 
                     {showGuidanceModal && (
-                        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
+                        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 no-print">
                             <div className="bg-white rounded-3xl p-8 max-w-lg w-full shadow-2xl scale-in duration-200">
                                 <h3 className="text-xl font-black mb-2 uppercase tracking-tight">AI Strategy Console</h3>
                                 <p className="text-slate-500 text-sm mb-6 leading-relaxed">Provide guidance on how the AI should approach the Global synthesis. Define tone, specific metrics to prioritize, or structure.</p>
@@ -542,7 +549,7 @@
                     )}
 
                     <nav className="w-full bg-[#1a3812] p-8 flex items-center justify-between no-print shadow-2xl border-b-[8px] border-green-900/20">
-                        <div className="flex items-center space-x-4"><Icons.Chart size={28} className="text-green-400" /><h1 className="text-2xl font-black text-white uppercase italic tracking-tighter leading-none">Monthly report tool</h1></div>
+                        <div className="flex items-center space-x-4"><Icons.Chart size={28} className="text-green-400" /><h1 className="text-2xl font-black text-white uppercase italic tracking-tighter leading-none">Intelligence Dashboard</h1></div>
                         <div className="flex gap-4">
                             {!data.length ? (
                                 <label className="px-10 py-4 bg-green-600 text-white rounded-2xl font-black uppercase text-xs cursor-pointer hover:bg-green-500 shadow-lg transition-all"><Icons.Upload size={20} className="mr-3 inline" /> Connect Data<input type="file" accept=".csv" className="hidden" onChange={handleFileUpload} /></label>
@@ -556,20 +563,24 @@
                                         </select>
                                         <select value={selectedRegion} onChange={e => setSelectedRegion(e.target.value)} className="bg-transparent text-white font-bold px-4 py-2 outline-none text-xs border-l border-white/10"><option value="GLOBAL" className="text-black">GLOBAL</option>{REGIONS.map(r => <option key={r} value={r} className="text-black">{r}</option>)}</select>
                                     </div>
-                                    <button onClick={() => window.print()} className="bg-white text-[#1a3812] px-8 py-4 rounded-2xl font-black text-xs uppercase shadow-lg hover:bg-green-50">Export PDF</button>
+                                    <button onClick={() => window.print()} className="bg-white text-[#1a3812] px-8 py-4 rounded-2xl font-black text-xs uppercase shadow-lg hover:bg-green-50 hover:scale-105 transition-transform">Export PDF</button>
                                     <button onClick={() => setData([])} className="bg-red-500/20 p-4 rounded-2xl text-red-100 hover:bg-red-600 transition-colors"><Icons.X size={20} /></button>
                                 </div>
                             )}
                         </div>
                     </nav>
+
                     <div className="max-w-5xl mx-auto p-12">
                         {data.length > 0 ? (
                             fullReport.map((rData, rIdx) => (
-                                <div key={rData.region} className={`space-y-16 ${rIdx > 0 ? 'region-section' : ''} animate-in`}>
-                                    <header className="border-l-[12px] border-green-600 pl-12 py-6 mb-20">
+                                <div key={rData.region} className={`space-y-0 ${rIdx > 0 ? 'region-section' : ''} animate-in`}>
+                                    {/* REGION HEADER & KPIs - Always Page 1 of Region */}
+                                    <header className="border-l-[12px] border-green-600 pl-12 py-6 mb-16">
                                         <h2 className="text-8xl font-black text-slate-900 tracking-tighter uppercase leading-none">{rData.region} <span className="text-green-600 block">{selectedMonth}</span></h2>
+                                        <p className="text-slate-400 font-black uppercase tracking-[0.6em] mt-8 text-[11px]">Performance Intelligence Dossier</p>
                                     </header>
-                                    <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
+
+                                    <div className="grid grid-cols-1 md:grid-cols-3 gap-8 mb-16">
                                         {[{ l: 'Total Investment', v: formatAccurateCurrency(rData.stats.cur.spend), ch: rData.stats.mom.spend, inv: false }, { l: 'Growth (MNCs)', v: rData.stats.cur.mncs.toLocaleString(), ch: rData.stats.mom.mncs, inv: false }, { l: 'Weighted Payback', v: `${rData.stats.cur.payback.toFixed(1)}m`, ch: rData.stats.mom.payback, inv: true }].map((k, i) => (
                                             <div key={i} className="bg-white rounded-[3rem] p-12 border shadow-xl flex flex-col justify-between">
                                                 <div className="flex justify-between items-start mb-10"><span className="text-[11px] font-black text-slate-400 uppercase tracking-widest">{k.l}</span><ChangeBadge val={k.ch} inverse={k.inv} /></div>
@@ -577,12 +588,21 @@
                                             </div>
                                         ))}
                                     </div>
+
+                                    {/* DASHBOARDS - Rendered with split logic for PDF */}
                                     {rData.dashboards.map((dash, dashIdx) => (
                                         <PlatformDashboard 
-                                            key={dash.title} region={rData.region} month={selectedMonth} title={dash.title} dashboard={dash} isOverall={dash.title === 'Overall'} isGlobal={rData.region === 'GLOBAL'}
+                                            key={dash.title} 
+                                            region={rData.region} 
+                                            month={selectedMonth} 
+                                            title={dash.title} 
+                                            dashboard={dash} 
+                                            isOverall={dash.title === 'Overall'} 
+                                            isGlobal={rData.region === 'GLOBAL'}
                                             onNarrativeChange={(p, t) => setComments(prev => ({ ...prev, [`${rData.region}_${selectedMonth}_${dash.title}`]: t }))}
                                             onRoadmapSync={(p, t) => setRoadmaps(prev => ({ ...prev, [`${rData.region}_${selectedMonth}_${dash.title}`]: t }))}
-                                            onSyncFromRegions={handleIntelligenceSync} isSyncing={isSyncing}
+                                            onSyncFromRegions={handleIntelligenceSync} 
+                                            isSyncing={isSyncing}
                                             commentary={comments[`${rData.region}_${selectedMonth}_${dash.title}`]}
                                             roadmap={roadmaps[`${rData.region}_${selectedMonth}_${dash.title}`]}
                                             isFirst={dashIdx === 0}
