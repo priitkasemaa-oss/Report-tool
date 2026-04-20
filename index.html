@@ -74,7 +74,6 @@
         // --- OPENAI API INTEGRATION ---
         const callAI = async (prompt, systemInstruction, providedKey) => {
             if (!providedKey) throw new Error("OpenAI API Key Missing. Click the Key icon in the nav bar.");
-            
             const url = "https://api.openai.com/v1/chat/completions";
             const payload = {
                 model: "gpt-4o-mini",
@@ -84,7 +83,6 @@
                 ],
                 temperature: 0.7
             };
-
             const response = await fetch(url, {
                 method: 'POST',
                 headers: { 
@@ -93,11 +91,8 @@
                 },
                 body: JSON.stringify(payload)
             });
-            
             const result = await response.json();
-            if (!response.ok) {
-                throw new Error(result.error?.message || "OpenAI API Communication Error");
-            }
+            if (!response.ok) throw new Error(result.error?.message || "OpenAI API Error");
             return result.choices[0].message.content || "Synthesis failed.";
         };
 
@@ -110,7 +105,8 @@
                 const raw = h.trim().replace(/^"|"$/g, '').toLowerCase().replace(/[^a-z0-9]/g, '');
                 if (raw.includes('month') || raw.includes('date')) return 'date';
                 if (raw.includes('country')) return 'country';
-                if (raw.includes('region')) return 'region';
+                if (raw.includes('marketingregion')) return 'region';
+                if (raw.includes('region') && !raw.includes('country')) return 'region';
                 if (raw.includes('platform') || raw.includes('source') || raw.includes('vendor')) return 'platform';
                 if (raw.includes('mncs') || raw.includes('deposits') || raw.includes('conv')) return 'mncs';
                 if (raw.includes('regs') || raw.includes('registrations')) return 'regs';
@@ -148,7 +144,8 @@
             Zap: (p) => <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" {...p}><path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"/></svg>,
             Key: (p) => <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" {...p}><path d="M21 2l-2 2m-7.61 7.61a5.5 5.5 0 1 1-7.778 7.778 5.5 5.5 0 0 1 7.777-7.777zm0 0L15.5 7.5m0 0l3 3m-3-3l2.5-2.5"/></svg>,
             Loader: (p) => <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="animate-spin" {...p}><path d="M12 2v4m0 12v4M4.93 4.93l2.83 2.83m8.48 8.48l2.83 2.83M2 12h4m12 0h4M4.93 19.07l2.83-2.83m8.48-8.48l2.83-2.83"/></svg>,
-            Map: (p) => <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" {...p}><path d="M3 6l6-3 6 3 6-3v15l-6 3-6-3-6 3V6zm6-3v15m6-15v15"/></svg>
+            Map: (p) => <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" {...p}><path d="M3 6l6-3 6 3 6-3v15l-6 3-6-3-6 3V6zm6-3v15m6-15v15"/></svg>,
+            Brain: (p) => <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" {...p}><path d="M9.5 2A5 5 0 0 1 12 4a5 5 0 0 1 2.5-2 4.5 4.5 0 1 1 0 9 5 5 0 0 1-5 0 4.5 4.5 0 1 1 0-9z"/><path d="M12 11v11"/><path d="M8 15v4"/><path d="M16 15v4"/></svg>
         };
 
         const AutoExpandingTextarea = ({ value, onChange, placeholder, className, isLoading }) => {
@@ -161,7 +158,7 @@
             }, [value]);
             return (
                 <div className="relative w-full">
-                    {isLoading && <div className="absolute inset-0 z-10 opacity-40 loading-shimmer rounded-[2rem]" />}
+                    {isLoading && <div className="absolute inset-0 z-10 opacity-40 loading-shimmer rounded-[2rem] no-print" />}
                     <textarea
                         ref={textareaRef}
                         value={value}
@@ -222,7 +219,7 @@
             }, [trend, month, contributionList, isOverall, title]);
 
             return (
-                <div className={`bg-white rounded-[2.5rem] shadow-2xl border border-slate-100 flex flex-col mb-12 overflow-visible page-top-margin platform-page-break`}>
+                <div className={`bg-white rounded-[2.5rem] shadow-2xl border border-slate-100 flex flex-col mb-12 overflow-visible platform-page-break`}>
                     <div className={`${isOverall ? 'bg-indigo-900' : 'bg-[#1a3812]'} px-10 py-6 border-b border-slate-200 flex justify-between items-center rounded-t-[2.5rem]`}>
                         <h3 className="text-2xl font-black text-white uppercase tracking-tighter">{title}</h3>
                         <span className="text-[10px] text-white/40 font-black uppercase tracking-[0.4em]">{isGlobal ? 'Regional Synthesis' : 'Market Analysis'}</span>
@@ -363,7 +360,9 @@
             const [roadmaps, setRoadmaps] = useState({});
             const [isSyncing, setIsSyncing] = useState(false);
             const [userKey, setUserKey] = useState("");
+            const [aiGuidance, setAiGuidance] = useState("Focus on MoM growth, identify high-efficiency markets, and pinpoint specific CPA outliers. Use a professional, executive tone.");
             const [showKeyModal, setShowKeyModal] = useState(false);
+            const [showGuidanceModal, setShowGuidanceModal] = useState(false);
 
             const handleFileUpload = (e) => {
                 const file = e.target.files[0];
@@ -403,7 +402,7 @@
 
                     if (!regionalInputs) { setIsSyncing(false); return; }
 
-                    const systemPrompt = "Analyze regional performance data and manual notes. Synthesize them into a master Global report. Separate your response into two distinct parts using 'NEXT MONTH PLANS START HERE' as a divider. Highlight cross-regional trends and CVR shifts.";
+                    const systemPrompt = `Guidance: ${aiGuidance}\n\nTask: Analyze regional performance data and manual notes. Synthesize them into a master Global report. Separate your response into two distinct parts using 'NEXT MONTH PLANS START HERE' as a divider. Highlight cross-regional trends and CVR shifts.`;
                     const result = await callAI(regionalInputs, systemPrompt, userKey);
                     
                     const sections = result.split(/NEXT MONTH PLANS START HERE/i);
@@ -433,8 +432,10 @@
                         const uniqueMarkets = [...new Set(current.map(d => r === 'GLOBAL' ? d.region : d.country))];
                         
                         const contributionList = uniqueMarkets.map(m => {
-                            const curAgg = aggregate(matchAllDates.filter(d => (r === 'GLOBAL' ? d.region : d.country) === m && d.date === selectedMonth));
-                            const prevAgg = aggregate(matchAllDates.filter(d => (r === 'GLOBAL' ? d.region : d.country) === m && d.date === pmS));
+                            const match = matchAllDates.filter(d => (r === 'GLOBAL' ? d.region : d.country) === m && d.date === selectedMonth);
+                            const prev = matchAllDates.filter(d => (r === 'GLOBAL' ? d.region : d.country) === m && d.date === pmS);
+                            const curAgg = aggregate(match);
+                            const prevAgg = aggregate(prev);
                             return { label: m, ...curAgg, momChange: prevAgg.mncs ? (curAgg.mncs-prevAgg.mncs)/prevAgg.mncs : 0 };
                         }).sort((a,b) => b.spend - a.spend);
 
@@ -458,6 +459,7 @@
 
             return (
                 <div className="min-h-screen pb-32">
+                    {/* Modals */}
                     {showKeyModal && (
                         <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
                             <div className="bg-white rounded-3xl p-8 max-w-md w-full shadow-2xl scale-in duration-200">
@@ -471,6 +473,22 @@
                             </div>
                         </div>
                     )}
+
+                    {showGuidanceModal && (
+                        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
+                            <div className="bg-white rounded-3xl p-8 max-w-lg w-full shadow-2xl scale-in duration-200">
+                                <h3 className="text-xl font-black mb-2 uppercase tracking-tight">AI Strategy Console</h3>
+                                <p className="text-slate-500 text-sm mb-6 leading-relaxed">Provide guidance on how the AI should approach the Global synthesis. Define tone, specific metrics to prioritize, or structure.</p>
+                                <textarea 
+                                    value={aiGuidance} 
+                                    onChange={e => setAiGuidance(e.target.value)} 
+                                    className="w-full p-6 bg-slate-50 border rounded-2xl mb-6 text-sm font-medium leading-relaxed h-40 outline-none focus:ring-2 focus:ring-green-600"
+                                />
+                                <button onClick={() => setShowGuidanceModal(false)} className="w-full py-4 bg-[#1a3812] text-white font-black rounded-2xl uppercase text-xs tracking-widest hover:bg-green-700">Update Strategy</button>
+                            </div>
+                        </div>
+                    )}
+
                     <nav className="w-full bg-[#1a3812] p-8 flex items-center justify-between no-print shadow-2xl border-b-[8px] border-green-900/20">
                         <div className="flex items-center space-x-4"><Icons.Chart size={28} className="text-green-400" /><h1 className="text-2xl font-black text-white uppercase italic tracking-tighter leading-none">Monthly report tool</h1></div>
                         <div className="flex gap-4">
@@ -478,10 +496,11 @@
                                 <label className="px-10 py-4 bg-green-600 text-white rounded-2xl font-black uppercase text-xs cursor-pointer hover:bg-green-500 shadow-lg transition-all"><Icons.Upload size={20} className="mr-3 inline" /> Connect Data<input type="file" accept=".csv" className="hidden" onChange={handleFileUpload} /></label>
                             ) : (
                                 <div className="flex gap-4">
+                                    <button onClick={() => setShowGuidanceModal(true)} title="AI Strategy" className="p-4 rounded-2xl bg-white/10 text-white/50 hover:bg-white/20 transition-all"><Icons.Brain size={20} /></button>
                                     <button onClick={() => setShowKeyModal(true)} title="Set API Key" className={`p-4 rounded-2xl transition-all ${userKey.trim() ? 'bg-green-500/20 text-green-400' : 'bg-white/10 text-white/50 hover:bg-white/20'}`}><Icons.Key size={20} /></button>
                                     <div className="flex bg-white/10 p-1 rounded-2xl border border-white/10">
                                         <select value={selectedMonth} onChange={e => setSelectedMonth(e.target.value)} className="bg-transparent text-white font-bold px-4 py-2 outline-none text-xs">{[...new Set(data.map(d => d.date))].sort().reverse().map(d => <option key={d} value={d} className="text-black">{d}</option>)}</select>
-                                        <select value={selectedRegion} onChange={e => setSelectedRegion(e.target.value)} className="bg-transparent text-white font-bold px-4 py-2 outline-none text-xs border-l border-white/10"><option value="GLOBAL" className="text-black">GLOBAL</option>{REGIONS.map(r => <option key={r} value={r} className="text-black">{r}</option>)}</select>
+                                        <select value={selectedRegion} onChange={e => setSelectedRegion(e.target.value)} className="bg-transparent text-white font-bold px-4 py-2 outline-none text-xs border-l border-white/10"><option value="GLOBAL" className="text-black">GLOBAL</option>{REGIONS.filter(r => r !== 'GLOBAL').map(r => <option key={r} value={r} className="text-black">{r}</option>)}</select>
                                     </div>
                                     <button onClick={() => window.print()} className="bg-white text-[#1a3812] px-8 py-4 rounded-2xl font-black text-xs uppercase shadow-lg hover:bg-green-50">Export PDF</button>
                                     <button onClick={() => setData([])} className="bg-red-500/20 p-4 rounded-2xl text-red-100 hover:bg-red-600 transition-colors"><Icons.X size={20} /></button>
