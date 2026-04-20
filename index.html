@@ -20,11 +20,11 @@
             body { background: white !important; padding: 0 !important; margin: 0 !important; }
             .max-w-5xl { max-width: 100% !important; padding: 0 !important; width: 100% !important; margin: 0 !important; }
             
-            /* Each Region (e.g. GLOBAL, NORTHAM) starts a new page */
+            /* Tightened layout for the first page */
             .region-section {
                 page-break-before: always !important;
                 break-before: page !important;
-                padding-top: 20px !important; 
+                padding-top: 10px !important; 
             }
             .region-section:first-of-type { 
                 page-break-before: avoid !important; 
@@ -32,22 +32,26 @@
                 padding-top: 0 !important; 
             }
             
-            /* Chart blocks and Table blocks are separated to match PDF sequence */
+            /* Pattern: Chart Page -> Table/Narrative Page */
             .chart-page-block {
                 page-break-after: always !important;
                 break-after: page !important;
+                margin-bottom: 0 !important;
             }
             
             .table-narrative-block {
                 page-break-after: always !important;
                 break-after: page !important;
+                margin-top: 0 !important;
             }
 
-            /* Final cleaning */
-            .shadow-2xl, .shadow-xl, .shadow-sm { box-shadow: none !important; border: 1px solid #f1f5f9 !important; }
-            .ring-4 { ring: 0 !important; border: 1px solid #e2e8f0 !important; }
+            .narrative-block { page-break-inside: avoid !important; break-inside: avoid !important; display: block !important; }
             tr { page-break-inside: avoid !important; break-inside: avoid !important; }
             thead { display: table-header-group !important; }
+            
+            /* Visual Flattening */
+            .shadow-2xl, .shadow-xl, .shadow-sm { box-shadow: none !important; border: 1px solid #f1f5f9 !important; }
+            .ring-4 { ring: 0 !important; border: 1px solid #e2e8f0 !important; }
         }
 
         .animate-in { animation: fadeIn 0.8s ease-out; }
@@ -85,7 +89,7 @@
         };
 
         const formatAccurateCurrency = (v) => {
-            return new Intl.NumberFormat('en-GB', { style: 'currency', currency: 'GBP', minimumFractionDigits: 2 }).format(v);
+            return new Intl.NumberFormat('en-GB', { style: 'currency', currency: 'GBP', minimumFractionDigits: 0 }).format(v);
         };
 
         // --- OPENAI API INTEGRATION ---
@@ -236,9 +240,9 @@
             }, [trend, month, contributionList, isOverall, title]);
 
             return (
-                <div className="platform-unit mb-12">
-                    {/* CHART BLOCK - One per Page */}
-                    <div className="bg-white rounded-[2.5rem] shadow-2xl border border-slate-100 flex flex-col overflow-visible chart-page-block">
+                <div className="platform-unit mb-12 space-y-0">
+                    {/* CHART BLOCK - Page 1 of Platform */}
+                    <div className="bg-white rounded-[2.5rem] shadow-2xl border border-slate-100 flex flex-col overflow-visible chart-page-block mb-12">
                         <div className={`${isOverall ? 'bg-indigo-900' : 'bg-[#1a3812]'} px-10 py-6 border-b border-slate-200 flex justify-between items-center rounded-t-[2.5rem]`}>
                             <h3 className="text-2xl font-black text-white uppercase tracking-tighter">{title}</h3>
                             <span className="text-[10px] text-white/40 font-black uppercase tracking-[0.4em]">{isGlobal ? 'Regional Synthesis' : 'Market Analysis'}</span>
@@ -261,7 +265,7 @@
                                         const x = getX(i);
                                         const mncH = (d.mncs / maxMnc) * (cH * 0.45); 
                                         
-                                        // Conditional logic: If spend is 0, don't show Spend/Payback labels
+                                        // Conditional: Hide Spend/PB labels if investment is 0
                                         let stack = [
                                             { id: 'mnc', val: d.mncs.toLocaleString(), y: pY + cH - mncH - 12, color: '#6366f1' },
                                             d.spend > 0 ? { id: 'spend', val: `£${Math.round(d.spend/1000)}k`, y: getLaneY(d.spend, sRange, 60, 82), color: '#ef4444' } : null,
@@ -286,7 +290,7 @@
                                     })}
                                 </svg>
                             </div>
-                            {/* GRAPH LEGEND - Visible in print */}
+                            {/* GRAPH LEGEND - Definition labels restored for PDF view */}
                             <div className="flex flex-wrap items-center justify-center gap-x-8 gap-y-2 px-6 pt-4 border-t border-slate-50">
                                 <div className="flex items-center gap-2"><div className="w-4 h-1 bg-[#ef4444] opacity-40"></div><span className="text-[10px] font-black uppercase text-slate-400 tracking-widest">Investment</span></div>
                                 <div className="flex items-center gap-2"><div className="w-3 h-3 bg-[#6366f1] rounded-sm"></div><span className="text-[10px] font-black uppercase text-slate-400 tracking-widest">MNC Volume</span></div>
@@ -296,7 +300,7 @@
                         </div>
                     </div>
 
-                    {/* TABLE & NARRATIVE BLOCK - Next Page */}
+                    {/* TABLE & NARRATIVE BLOCK - Page 2 of Platform */}
                     <div className="bg-white rounded-[2.5rem] shadow-2xl border border-slate-100 flex flex-col p-10 space-y-10 table-narrative-block">
                         <div className="bg-white border border-slate-100 rounded-[2rem] overflow-hidden shadow-sm">
                             <table className="w-full text-center text-xs border-collapse">
@@ -507,7 +511,7 @@
                         
                         const summaryTotals = {
                             mom: { spend: calcShift(curTotal.spend, pmTotal.spend), regs: calcShift(curTotal.regs, pmTotal.regs), mncs: calcShift(curTotal.mncs, pmTotal.mncs), cvr: calcShift(curTotal.cvr, pmTotal.cvr), cpa: calcShift(curTotal.cpa, pmTotal.cpa), ltv: calcShift(curTotal.ltv, pmTotal.ltv), payback: calcShift(curTotal.payback, pmTotal.payback) },
-                            yoy: { spend: calcShift(curTotal.spend, pyTotal.spend), regs: calcShift(curTotal.regs, pyTotal.regs), mncs: calcShift(curTotal.mncs, pyTotal.mncs), cvr: calcShift(curTotal.cvr, pyTotal.cvr), cpa: calcShift(curTotal.cpa, pmTotal.cpa), ltv: calcShift(curTotal.ltv, pyTotal.ltv), payback: calcShift(curTotal.payback, pyTotal.payback) }
+                            yoy: { spend: calcShift(curTotal.spend, pyTotal.spend), regs: calcShift(curTotal.regs, pyTotal.regs), mncs: calcShift(curTotal.mncs, pyTotal.mncs), cvr: calcShift(curTotal.cvr, pyTotal.cvr), cpa: calcShift(curTotal.cpa, pyTotal.cpa), ltv: calcShift(curTotal.ltv, pyTotal.ltv), payback: calcShift(curTotal.payback, pyTotal.payback) }
                         };
 
                         return { title: p, trend, contributionList: activeMarkets, summaryTotals };
@@ -582,12 +586,12 @@
                                         <p className="text-slate-400 font-black uppercase tracking-[0.6em] mt-8 text-[11px]">Performance Intelligence Dossier</p>
                                     </header>
 
-                                    {/* Responsive KPI Cards: reduced text size to prevent overflow */}
+                                    {/* Responsive KPI Cards: reduced text size to prevent overflow & decimals removed */}
                                     <div className="grid grid-cols-1 md:grid-cols-3 gap-8 mb-16">
                                         {[{ l: 'Total Investment', v: formatAccurateCurrency(rData.stats.cur.spend), ch: rData.stats.mom.spend, inv: false }, { l: 'Growth (MNCs)', v: rData.stats.cur.mncs.toLocaleString(), ch: rData.stats.mom.mncs, inv: false }, { l: 'Weighted Payback', v: `${rData.stats.cur.payback.toFixed(1)}m`, ch: rData.stats.mom.payback, inv: true }].map((k, i) => (
-                                            <div key={i} className="bg-white rounded-[3rem] p-10 border shadow-xl flex flex-col justify-between overflow-hidden">
-                                                <div className="flex justify-between items-start mb-8"><span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">{k.l}</span><ChangeBadge val={k.ch} inverse={k.inv} /></div>
-                                                <span className="text-4xl font-black text-slate-900 tracking-tighter leading-none break-all">{k.v}</span>
+                                            <div key={i} className="bg-white rounded-[3rem] p-8 border shadow-xl flex flex-col justify-between overflow-hidden">
+                                                <div className="flex justify-between items-start mb-6"><span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">{k.l}</span><ChangeBadge val={k.ch} inverse={k.inv} /></div>
+                                                <span className="text-3xl font-black text-slate-900 tracking-tighter leading-none break-words">{k.v}</span>
                                             </div>
                                         ))}
                                     </div>
@@ -608,7 +612,6 @@
                                             isSyncing={isSyncing}
                                             commentary={comments[`${rData.region}_${selectedMonth}_${dash.title}`]}
                                             roadmap={roadmaps[`${rData.region}_${selectedMonth}_${dash.title}`]}
-                                            isFirst={dashIdx === 0}
                                         />
                                     ))}
                                 </div>
