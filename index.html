@@ -54,13 +54,13 @@
         }
 
         @media print {
-            @page { size: landscape; margin: 0; }
+            @page { size: 1280px 720px; margin: 0; }
             body { background: white !important; padding: 0 !important; margin: 0 !important; }
             .no-print { display: none !important; }
             .slide-container {
                 margin: 0 !important;
-                width: 100vw !important;
-                height: 100vh !important;
+                width: 1280px !important;
+                height: 720px !important;
                 max-width: none !important;
                 page-break-after: always !important;
                 break-after: page !important;
@@ -68,6 +68,17 @@
                 border: none !important;
                 border-radius: 0 !important;
                 padding: 0.5cm !important; /* Exactly 0.5cm margin for PDF export */
+            }
+            
+            /* Fix for PDF shadow artifacts causing grey boxes */
+            * {
+                box-shadow: none !important;
+            }
+            
+            /* Clean up textareas for PDF export */
+            textarea {
+                overflow: hidden !important;
+                resize: none !important;
             }
         }
 
@@ -660,7 +671,7 @@ Output as a JSON object with these EXACT keys:
                                                                     <div className="flex flex-col items-end gap-0.5">
                                                                         <span className="font-black text-slate-900 text-[14px]">£{p.ltv.toFixed(2)}</span>
                                                                         {renderTablePct(p.shifts?.mom?.ltv, 'ltv', p.ltv)}
-                                                                    </div>
+                                                                </div>
                                                                 </td>
                                                             ))}
                                                         </tr>
@@ -1261,3 +1272,5 @@ Output as a JSON object with these EXACT keys:
     </script>
 </body>
 </html>
+
+
