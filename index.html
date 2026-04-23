@@ -32,6 +32,11 @@
             --brand-indigo: #4338ca;
         }
 
+        html, body {
+            margin: 0;
+            padding: 0;
+        }
+
         body { 
             font-family: 'Inter', sans-serif; 
             background-color: #f1f5f9;
@@ -55,7 +60,7 @@
 
         @media print {
             @page { size: 1280px 720px; margin: 0; }
-            body { background: white !important; padding: 0 !important; margin: 0 !important; }
+            html, body { background: white !important; padding: 0 !important; margin: 0 !important; height: auto !important; }
             .no-print { display: none !important; }
             .slide-container {
                 margin: 0 !important;
@@ -64,14 +69,15 @@
                 max-width: none !important;
                 page-break-after: always !important;
                 break-after: page !important;
+                page-break-inside: avoid !important;
                 box-shadow: none !important;
                 border: none !important;
                 border-radius: 0 !important;
                 padding: 0.5cm !important; /* Exactly 0.5cm margin for PDF export */
             }
-            .slide-container:last-child {
-                page-break-after: auto !important;
-                break-after: auto !important;
+            .slide-container.last-slide {
+                page-break-after: avoid !important;
+                break-after: avoid !important;
             }
             
             /* Fix for PDF shadow artifacts causing grey boxes */
@@ -141,6 +147,19 @@
             return d.length > 3 ? d.substring(0, 3) + " 2026" : d;
         };
 
+        const getRegionSubtitle = (region) => {
+            const map = {
+                'LATAM': '🇧🇷',
+                'NORTHAM': '🇺🇸 🇨🇦',
+                'EUROPE': '🇪🇺',
+                'ASIA': '🇲🇾 🇸🇬 🇯🇵 🇮🇩 🇵🇭',
+                'PACIFIC': '🇦🇺 🇳🇿',
+                'GBR': '🇬🇧',
+                'MEA': '🇹🇷'
+            };
+            return map[region] || '';
+        };
+
         const parseCSVRows = (text, delimiter) => {
             const rows = [];
             let row = [];
@@ -189,7 +208,7 @@
                 const prev = rawVal / (1 + val);
                 good = Math.abs(rawVal - 15) < Math.abs(prev - 15);
             }
-            if (metricType === 'spend') good = isPos;
+            if (metricType === 'spend' || metricType === 'cm') good = isPos;
 
             return (
                 <div className="flex flex-col items-center">
@@ -201,7 +220,7 @@
             );
         };
 
-        const MetricCard = ({ title, val, mom, yoy, inverse = false, rawVal }) => {
+        const MetricCard = ({ title, val, mom, yoy, inverse = false, rawVal, mainColor = 'text-wise-forest', labelColor = 'text-wise-forest/70' }) => {
             const formatPct = (v) => (Math.abs(v) * 100).toFixed(1) + '%';
             const getColor = (v) => {
                 if (v === undefined || v === null || v === 0 || !isFinite(v)) return 'text-slate-400';
@@ -211,17 +230,17 @@
                     const prev = rawVal / (1 + v);
                     good = Math.abs(rawVal - 15) < Math.abs(prev - 15);
                 }
-                if (title === 'Spend') good = v > 0; 
+                if (title === 'Spend' || title === 'CM') good = v > 0; 
                 
                 return good ? 'text-green-600' : 'text-[#d32f2f]'; 
             };
             const getSign = (v) => (v > 0 ? '+' : v < 0 ? '-' : '');
 
             return (
-                <div className="bg-[#f2f2f2] rounded-[1.2rem] py-2 px-2 flex flex-col justify-center items-center min-w-[125px] flex-1 text-center shadow-sm">
-                    <span className="text-wise-forest/70 font-bold text-[11px] uppercase tracking-widest mb-0.5">{title}</span>
-                    <span className="text-wise-forest font-black text-3xl tracking-tighter mb-1 leading-none">{val}</span>
-                    <div className="flex flex-col items-center gap-0 text-[9px] font-bold">
+                <div className="bg-[#f2f2f2] rounded-[1rem] py-1.5 px-1.5 flex flex-col justify-center items-center min-w-[95px] flex-1 text-center shadow-sm">
+                    <span className={`${labelColor} font-bold text-[10px] uppercase tracking-widest mb-0.5`}>{title}</span>
+                    <span className={`${mainColor} font-black text-2xl tracking-tighter mb-1 leading-none`}>{val}</span>
+                    <div className="flex flex-col items-center gap-0 text-[8px] font-bold">
                         {mom !== undefined && (
                             <span className={getColor(mom)}>{getSign(mom)}{formatPct(mom)} MoM</span>
                         )}
@@ -258,6 +277,7 @@
                 let good = isPos; 
                 
                 if (metricType === 'spend') good = isPos; 
+                if (metricType === 'cm') good = isPos; 
                 if (metricType === 'cpa') good = !isPos; 
                 if (metricType === 'ltv') good = isPos; 
                 if (metricType === 'payback') {
@@ -268,7 +288,7 @@
                 const color = good ? 'text-green-600' : 'text-[#d32f2f]';
                 return (
                     <div className={`flex flex-col items-end leading-tight ${color}`}>
-                        <span className="text-[12px] font-black">{isPos ? '+' : ''}{(val * 100).toFixed(1)}%</span>
+                        <span className="text-[10px] font-black">{isPos ? '+' : ''}{(val * 100).toFixed(1)}%</span>
                     </div>
                 );
             };
@@ -279,6 +299,7 @@
                 let good = isPos; 
                 
                 if (metricType === 'spend') good = isPos; 
+                if (metricType === 'cm') good = isPos; 
                 if (metricType === 'cpa') good = !isPos; 
                 if (metricType === 'ltv') good = isPos; 
                 if (metricType === 'payback') {
@@ -312,6 +333,7 @@
                             if (clean.includes('payback')) return 'payback';
                             if (clean.includes('ltv')) return 'ltv';
                             if (clean.includes('regs') || clean.includes('regist')) return 'regs';
+                            if (clean === 'cm' || clean.includes('internalmeasurescm') || clean.includes('interanlmeasurescm') || clean.includes('contributionmargin')) return 'cm';
                             return clean;
                         });
                         setHeaders(mappedHeaders);
@@ -341,12 +363,12 @@
             };
 
             const aggregate = (records) => {
-                let s = 0, m = 0, r = 0, lSum = 0, pWSum = 0;
+                let s = 0, m = 0, r = 0, lSum = 0, pWSum = 0, cmSum = 0;
                 records.forEach(rec => {
-                    const sp = safeNum(rec.spend), mn = Math.round(safeNum(rec.mncs)), regs = Math.round(safeNum(rec.regs)), pb = safeNum(rec.payback), ltv = safeNum(rec.ltv);
-                    s += sp; m += mn; r += regs; lSum += ltv * mn; pWSum += pb * mn;
+                    const sp = safeNum(rec.spend), mn = Math.round(safeNum(rec.mncs)), regs = Math.round(safeNum(rec.regs)), pb = safeNum(rec.payback), ltv = safeNum(rec.ltv), cm = safeNum(rec.cm);
+                    s += sp; m += mn; r += regs; lSum += ltv * mn; pWSum += pb * mn; cmSum += cm;
                 });
-                return { spend: s, mncs: m, regs: r, cpa: m > 0 ? s / m : 0, payback: m > 0 ? pWSum / m : 0, ltv: m > 0 ? lSum / m : 0, cvr: r > 0 ? m / r : 0 };
+                return { spend: s, mncs: m, regs: r, cpa: m > 0 ? s / m : 0, payback: m > 0 ? pWSum / m : 0, ltv: m > 0 ? lSum / m : 0, cvr: r > 0 ? m / r : 0, cm: cmSum };
             };
 
             const reportData = useMemo(() => {
@@ -397,21 +419,24 @@
                                     mncs: calcShift(curAgg.mncs, pmAgg.mncs),
                                     payback: calcShift(curAgg.payback, pmAgg.payback),
                                     ltv: calcShift(curAgg.ltv, pmAgg.ltv),
-                                    cpa: calcShift(curAgg.cpa, pmAgg.cpa)
+                                    cpa: calcShift(curAgg.cpa, pmAgg.cpa),
+                                    cm: calcShift(curAgg.cm, pmAgg.cm)
                                 },
                                 qoq: {
                                     spend: calcShift(curAgg.spend, pqAgg.spend),
                                     mncs: calcShift(curAgg.mncs, pqAgg.mncs),
                                     payback: calcShift(curAgg.payback, pqAgg.payback),
                                     ltv: calcShift(curAgg.ltv, pqAgg.ltv),
-                                    cpa: calcShift(curAgg.cpa, pqAgg.cpa)
+                                    cpa: calcShift(curAgg.cpa, pqAgg.cpa),
+                                    cm: calcShift(curAgg.cm, pqAgg.cm)
                                 },
                                 yoy: {
                                     spend: calcShift(curAgg.spend, pyAgg.spend),
                                     mncs: calcShift(curAgg.mncs, pyAgg.mncs),
                                     payback: calcShift(curAgg.payback, pyAgg.payback),
                                     ltv: calcShift(curAgg.ltv, pyAgg.ltv),
-                                    cpa: calcShift(curAgg.cpa, pyAgg.cpa)
+                                    cpa: calcShift(curAgg.cpa, pyAgg.cpa),
+                                    cm: calcShift(curAgg.cm, pyAgg.cm)
                                 }
                             }
                         };
@@ -421,7 +446,7 @@
                     const breakDownRecords = curMatchNoAvow;
                     let dimKey = isGlobal ? 'region' : 'country';
                     if (!isGlobal && breakDownRecords.every(d => !d.country || d.country === regionName)) {
-                        const candidate = headers.find(h => !['date', 'region', 'platform', 'mncs', 'spend', 'regs', 'payback', 'ltv', 'country'].includes(h));
+                        const candidate = headers.find(h => !['date', 'region', 'platform', 'mncs', 'spend', 'regs', 'payback', 'ltv', 'cm', 'country'].includes(h));
                         if (candidate) dimKey = candidate;
                     }
 
@@ -446,8 +471,9 @@
                             regs: acc.regs + curr.regs,
                             mncs: acc.mncs + curr.mncs,
                             ltv: acc.ltv + curr.mncs * curr.ltv,
-                            payback: acc.payback + curr.mncs * curr.payback
-                        }), { spend: 0, regs: 0, mncs: 0, ltv: 0, payback: 0 });
+                            payback: acc.payback + curr.mncs * curr.payback,
+                            cm: acc.cm + curr.cm
+                        }), { spend: 0, regs: 0, mncs: 0, ltv: 0, payback: 0, cm: 0 });
 
                         finalBreakDown.push({
                             label: restLabel,
@@ -463,9 +489,9 @@
                         name: regionName, 
                         stats, 
                         shifts: {
-                            mom: { spend: calcShift(stats.spend, pmS.spend), mncs: calcShift(stats.mncs, pmS.mncs), payback: calcShift(stats.payback, pmS.payback), ltv: calcShift(stats.ltv, pmS.ltv), cpa: calcShift(stats.cpa, pmS.cpa) },
-                            qoq: { spend: calcShift(stats.spend, pqS.spend), mncs: calcShift(stats.mncs, pqS.mncs), payback: calcShift(stats.payback, pqS.payback), ltv: calcShift(stats.ltv, pqS.ltv), cpa: calcShift(stats.cpa, pqS.cpa) },
-                            yoy: { spend: calcShift(stats.spend, pyS.spend), mncs: calcShift(stats.mncs, pyS.mncs), payback: calcShift(stats.payback, pyS.payback), ltv: calcShift(stats.ltv, pyS.ltv), cpa: calcShift(stats.cpa, pyS.cpa) }
+                            mom: { spend: calcShift(stats.spend, pmS.spend), mncs: calcShift(stats.mncs, pmS.mncs), payback: calcShift(stats.payback, pmS.payback), ltv: calcShift(stats.ltv, pmS.ltv), cpa: calcShift(stats.cpa, pmS.cpa), cm: calcShift(stats.cm, pmS.cm) },
+                            qoq: { spend: calcShift(stats.spend, pqS.spend), mncs: calcShift(stats.mncs, pqS.mncs), payback: calcShift(stats.payback, pqS.payback), ltv: calcShift(stats.ltv, pqS.ltv), cpa: calcShift(stats.cpa, pqS.cpa), cm: calcShift(stats.cm, pqS.cm) },
+                            yoy: { spend: calcShift(stats.spend, pyS.spend), mncs: calcShift(stats.mncs, pyS.mncs), payback: calcShift(stats.payback, pyS.payback), ltv: calcShift(stats.ltv, pyS.ltv), cpa: calcShift(stats.cpa, pyS.cpa), cm: calcShift(stats.cm, pyS.cm) }
                         },
                         platformStats, 
                         breakDown: finalBreakDown.slice(0, 16), 
@@ -506,20 +532,20 @@ ${regContext}
 Instructions:
 1. Provide a global summary for Global Paid Display (GLOBAL_perf) and the three main platforms: Google AC (GAC_perf), Moloco (MOLOCO_perf), and The Trade Desk (TTD_perf). Ensure any mention of "paid display" is capitalized as "Paid Display".
 2. For "GLOBAL_perf", provide 2-3 sentences summarizing the biggest global trends (e.g., specific market wins, creative performance, or tech shifts) derived from regional input.
-3. For "GLOBAL_plan", provide a summarized bulleted list of the top 3-5 highest-priority upcoming initiatives globally. IMPORTANT: Separate each bullet point with two newlines (\\n\\n) so they are not side-by-side.
+3. For "GLOBAL_plan", provide a summarized bulleted list of the top 3-5 highest-priority upcoming initiatives globally. IMPORTANT: Do NOT use bullet points or • characters in the output string. Separate each plan with two newlines (\\n\\n).
 4. For platform performance (GAC_perf, MOLOCO_perf, TTD_perf), provide 2-3 sentences summarizing their specific performance story based on regional details.
-5. For platform plans (GAC_plan, MOLOCO_plan, TTD_plan), provide 2-3 key upcoming initiatives specific to that channel. IMPORTANT: Separate each bullet point with two newlines (\\n\\n) so they are not side-by-side.
+5. For platform plans (GAC_plan, MOLOCO_plan, TTD_plan), provide 2-3 key upcoming initiatives specific to that channel. IMPORTANT: Do NOT use bullet points or • characters in the output string. Separate each plan with two newlines (\\n\\n).
 
 Output as a JSON object with these EXACT keys:
 {
   "GLOBAL_perf": "text string",
-  "GLOBAL_plan": "bulleted string starting with • (separate each bullet with \\n\\n)",
+  "GLOBAL_plan": "string of initiatives separated by \\n\\n (NO bullet points or •)",
   "GAC_perf": "text string",
-  "GAC_plan": "bulleted string starting with • (separate each bullet with \\n\\n)",
+  "GAC_plan": "string of initiatives separated by \\n\\n (NO bullet points or •)",
   "MOLOCO_perf": "text string",
-  "MOLOCO_plan": "bulleted string starting with • (separate each bullet with \\n\\n)",
+  "MOLOCO_plan": "string of initiatives separated by \\n\\n (NO bullet points or •)",
   "TTD_perf": "text string",
-  "TTD_plan": "bulleted string starting with • (separate each bullet with \\n\\n)"
+  "TTD_plan": "string of initiatives separated by \\n\\n (NO bullet points or •)"
 }`;
                     
                     const res = await fetch("https://api.openai.com/v1/chat/completions", { 
@@ -575,7 +601,7 @@ Output as a JSON object with these EXACT keys:
             }
 
             return (
-                <div className="bg-slate-100 min-h-screen pb-20">
+                <div className="bg-slate-100 min-h-screen print:pb-0 pb-20">
                     <nav className="no-print sticky top-0 z-50 bg-wise-forest px-8 py-4 flex justify-between items-center shadow-2xl border-b border-white/5">
                         <div className="flex items-center gap-4">
                             <Icons.Chart className="text-wise-fast" />
@@ -598,7 +624,7 @@ Output as a JSON object with these EXACT keys:
                         </div>
                     </nav>
 
-                    <div className="slide-content">
+                    <div className="slide-content print:pb-0 print:mb-0">
                         {/* Slide 1: Cover */}
                         <div className="slide-container bg-wise-forest overflow-hidden relative">
                             <div className="flex flex-col justify-between h-full relative z-10 w-full">
@@ -611,7 +637,50 @@ Output as a JSON object with these EXACT keys:
                             </div>
                         </div>
 
-                        {/* Slide 2: Section Divider - Performance Overview */}
+                        {/* Slide 2: Overall MoM Channel View */}
+                        {reportData && (
+                            <div className="slide-container bg-wise-fast overflow-hidden relative flex flex-col text-wise-forest">
+                                <div className="w-full flex justify-start -ml-[0.5cm] mt-4 mb-8 relative z-20">
+                                    <div className="bg-wise-forest text-wise-fast font-black uppercase rounded-r-full inline-flex items-center pl-[0.5cm] pr-12 py-3" style={{ fontSize: '3rem', lineHeight: '1.1' }}>
+                                        <span className="tracking-tighter">{getMoName(selectedMonth).toUpperCase()} {selectedMonth.split('-').find(p => p.length === 4) || '2026'}</span>
+                                    </div>
+                                </div>
+                                
+                                <div className="flex-1 flex items-center justify-center gap-12 w-full px-12 pb-8">
+                                    {/* MNCs */}
+                                    <div className="flex flex-col items-center justify-center flex-1">
+                                        <span className="text-3xl font-bold uppercase tracking-widest opacity-70 mb-4">MNCs</span>
+                                        <span className="font-black tracking-tighter leading-none mb-4" style={{ fontSize: '7rem' }}>{fmtCompactNum(reportData.global.stats.mncs)}</span>
+                                        <span className="text-4xl font-black tracking-tighter opacity-80">{reportData.global.shifts.mom.mncs > 0 ? '+' : ''}{(reportData.global.shifts.mom.mncs * 100).toFixed(1)}% MoM</span>
+                                        <span className="text-2xl font-black tracking-tighter opacity-60 mt-2">{reportData.global.shifts.yoy.mncs > 0 ? '+' : ''}{(reportData.global.shifts.yoy.mncs * 100).toFixed(1)}% YoY</span>
+                                    </div>
+                                    
+                                    {/* Divider */}
+                                    <div className="w-2 h-64 bg-wise-forest opacity-30 rounded-full"></div>
+                                    
+                                    {/* Payback */}
+                                    <div className="flex flex-col items-center justify-center flex-1">
+                                        <span className="text-3xl font-bold uppercase tracking-widest opacity-70 mb-4">Payback</span>
+                                        <span className="font-black tracking-tighter leading-none mb-4" style={{ fontSize: '7rem' }}>{reportData.global.stats.payback.toFixed(1)}m</span>
+                                        <span className="text-4xl font-black tracking-tighter opacity-80">{reportData.global.shifts.mom.payback > 0 ? '+' : ''}{(reportData.global.shifts.mom.payback * 100).toFixed(1)}% MoM</span>
+                                        <span className="text-2xl font-black tracking-tighter opacity-60 mt-2">{reportData.global.shifts.yoy.payback > 0 ? '+' : ''}{(reportData.global.shifts.yoy.payback * 100).toFixed(1)}% YoY</span>
+                                    </div>
+
+                                    {/* Divider */}
+                                    <div className="w-2 h-64 bg-wise-forest opacity-30 rounded-full"></div>
+                                    
+                                    {/* CM */}
+                                    <div className="flex flex-col items-center justify-center flex-1">
+                                        <span className="text-3xl font-bold uppercase tracking-widest opacity-70 mb-4">CM</span>
+                                        <span className="font-black tracking-tighter leading-none mb-4" style={{ fontSize: '7rem' }}>{fmtCompactCurr(reportData.global.stats.cm)}</span>
+                                        <span className="text-4xl font-black tracking-tighter opacity-80">{reportData.global.shifts.mom.cm > 0 ? '+' : ''}{(reportData.global.shifts.mom.cm * 100).toFixed(1)}% MoM</span>
+                                        <span className="text-2xl font-black tracking-tighter opacity-60 mt-2">{reportData.global.shifts.yoy.cm > 0 ? '+' : ''}{(reportData.global.shifts.yoy.cm * 100).toFixed(1)}% YoY</span>
+                                    </div>
+                                </div>
+                            </div>
+                        )}
+
+                        {/* Slide 3: Section Divider - Performance Overview */}
                         <div className="slide-container bg-wise-fast overflow-hidden relative">
                             <h1 className="text-wise-forest font-black uppercase tracking-tighter" style={{ fontSize: '8.5rem', lineHeight: '0.9' }}>
                                 PERFORMANCE<br/>OVERVIEW
@@ -623,21 +692,22 @@ Output as a JSON object with these EXACT keys:
                             </div>
                         </div>
 
-                        {/* Slide 3: Global Overview */}
+                        {/* Slide 4: Global Overview */}
                         {reportData && (
                             <div className="slide-container">
                                 <div className="flex justify-between items-start mb-4 w-full gap-3">
-                                    <div className="bg-wise-fast text-wise-forest font-black uppercase rounded-r-full flex flex-col justify-center -ml-[0.5cm] pl-[0.5cm] pr-10 py-2" style={{ fontSize: '2.5rem', lineHeight: '1.1' }}>
+                                    <div className="bg-wise-fast text-wise-forest font-black uppercase rounded-r-full flex flex-col justify-center -ml-[0.5cm] pl-[0.5cm] pr-8 py-2" style={{ fontSize: '2.2rem', lineHeight: '1.1' }}>
                                         <span className="tracking-tighter">PAID DISPLAY</span>
                                         <span className="tracking-tighter">PERFORMANCE</span>
                                     </div>
                                     
-                                    <div className="flex gap-2 flex-1 justify-end">
+                                    <div className="flex gap-1.5 flex-1 justify-end">
                                         <MetricCard title="Spend" val={fmtCompactCurr(reportData.global.stats.spend)} mom={reportData.global.shifts.mom.spend} yoy={reportData.global.shifts.yoy.spend} inverse={false} rawVal={reportData.global.stats.spend} />
                                         <MetricCard title="MNCs" val={fmtCompactNum(reportData.global.stats.mncs)} mom={reportData.global.shifts.mom.mncs} yoy={reportData.global.shifts.yoy.mncs} inverse={false} rawVal={reportData.global.stats.mncs} />
                                         <MetricCard title="LTV" val={`£${reportData.global.stats.ltv.toFixed(2)}`} mom={reportData.global.shifts.mom.ltv} yoy={reportData.global.shifts.yoy.ltv} inverse={false} rawVal={reportData.global.stats.ltv} />
-                                        <MetricCard title="CPA" val={`£${reportData.global.stats.cpa.toFixed(0)}`} mom={reportData.global.shifts.mom.cpa} yoy={reportData.global.shifts.yoy.cpa} inverse={true} rawVal={reportData.global.stats.cpa} />
+                                        <MetricCard title="CPA" val={`£${reportData.global.stats.cpa.toFixed(2)}`} mom={reportData.global.shifts.mom.cpa} yoy={reportData.global.shifts.yoy.cpa} inverse={true} rawVal={reportData.global.stats.cpa} />
                                         <MetricCard title="Payback" val={reportData.global.stats.payback.toFixed(1) + 'm'} mom={reportData.global.shifts.mom.payback} yoy={reportData.global.shifts.yoy.payback} inverse={true} rawVal={reportData.global.stats.payback} />
+                                        <MetricCard title="CM" val={fmtCompactCurr(reportData.global.stats.cm)} mom={reportData.global.shifts.mom.cm} yoy={reportData.global.shifts.yoy.cm} inverse={false} rawVal={reportData.global.stats.cm} />
                                     </div>
                                 </div>
                                 
@@ -648,67 +718,78 @@ Output as a JSON object with these EXACT keys:
                                                 <Icons.Info size={16} /> Platform Split
                                             </h4>
                                             <div className="flex-1 overflow-y-auto pr-2">
-                                                <table className="w-full text-[13px] font-bold border-collapse">
+                                                <table className="w-full text-[12px] font-bold border-collapse">
                                                     <thead className="text-slate-400 uppercase tracking-widest border-b-2 border-slate-200">
                                                         <tr>
-                                                            <th className="py-1.5 px-2 text-left">Platform</th>
+                                                            <th className="py-1 px-1 text-left">Platform</th>
                                                             {reportData.global.platformStats.map((p, i) => (
-                                                                <th key={i} className="py-1.5 px-2 text-right">{p.name}</th>
+                                                                <th key={i} className="py-1 px-1 text-right">{p.name}</th>
                                                             ))}
                                                         </tr>
                                                     </thead>
                                                     <tbody className="divide-y-2 divide-slate-100">
                                                         <tr className="hover:bg-white transition-colors">
-                                                            <td className="py-2 px-2 uppercase text-slate-700 font-black">Spend</td>
+                                                            <td className="py-1.5 px-1.5 uppercase text-slate-700 font-black">Spend</td>
                                                             {reportData.global.platformStats.map((p, i) => (
-                                                                <td key={i} className="py-2 px-2 text-right">
+                                                                <td key={i} className="py-1.5 px-1.5 text-right">
                                                                     <div className="flex flex-col items-end gap-0.5">
-                                                                        <span className="font-black text-slate-900 text-[14px]">{fmtCompactCurr(p.spend)}</span>
+                                                                        <span className="font-black text-slate-900 text-[12px]">{fmtCompactCurr(p.spend)}</span>
                                                                         {renderTablePct(p.shifts?.mom?.spend, 'spend', p.spend)}
                                                                     </div>
                                                                 </td>
                                                             ))}
                                                         </tr>
                                                         <tr className="hover:bg-white transition-colors">
-                                                            <td className="py-2 px-2 uppercase text-slate-700 font-black">MNCs</td>
+                                                            <td className="py-1.5 px-1.5 uppercase text-slate-700 font-black">MNCs</td>
                                                             {reportData.global.platformStats.map((p, i) => (
-                                                                <td key={i} className="py-2 px-2 text-right">
+                                                                <td key={i} className="py-1.5 px-1.5 text-right">
                                                                     <div className="flex flex-col items-end gap-0.5">
-                                                                        <span className="font-black text-slate-900 text-[14px]">{p.mncs.toLocaleString()}</span>
+                                                                        <span className="font-black text-slate-900 text-[12px]">{p.mncs.toLocaleString()}</span>
                                                                         {renderTablePct(p.shifts?.mom?.mncs, 'mncs', p.mncs)}
                                                                     </div>
                                                                 </td>
                                                             ))}
                                                         </tr>
                                                         <tr className="hover:bg-white transition-colors">
-                                                            <td className="py-2 px-2 uppercase text-slate-700 font-black">LTV</td>
+                                                            <td className="py-1.5 px-1.5 uppercase text-slate-700 font-black">LTV</td>
                                                             {reportData.global.platformStats.map((p, i) => (
-                                                                <td key={i} className="py-2 px-2 text-right">
+                                                                <td key={i} className="py-1.5 px-1.5 text-right">
                                                                     <div className="flex flex-col items-end gap-0.5">
-                                                                        <span className="font-black text-slate-900 text-[14px]">£{p.ltv.toFixed(2)}</span>
+                                                                        <span className="font-black text-slate-900 text-[12px]">£{p.ltv.toFixed(2)}</span>
                                                                         {renderTablePct(p.shifts?.mom?.ltv, 'ltv', p.ltv)}
                                                                 </div>
                                                                 </td>
                                                             ))}
                                                         </tr>
                                                         <tr className="hover:bg-white transition-colors">
-                                                            <td className="py-2 px-2 uppercase text-slate-700 font-black">CPA</td>
+                                                            <td className="py-1.5 px-1.5 uppercase text-slate-700 font-black">CPA</td>
                                                             {reportData.global.platformStats.map((p, i) => (
-                                                                <td key={i} className="py-2 px-2 text-right">
+                                                                <td key={i} className="py-1.5 px-1.5 text-right">
                                                                     <div className="flex flex-col items-end gap-0.5">
-                                                                        <span className="font-black text-slate-900 text-[14px]">£{p.cpa.toFixed(0)}</span>
+                                                                        <span className="font-black text-slate-900 text-[12px]">£{p.cpa.toFixed(2)}</span>
                                                                         {renderTablePct(p.shifts?.mom?.cpa, 'cpa', p.cpa)}
                                                                     </div>
                                                                 </td>
                                                             ))}
                                                         </tr>
                                                         <tr className="hover:bg-white transition-colors">
-                                                            <td className="py-2 px-2 uppercase text-slate-700 font-black">PB</td>
+                                                            <td className="py-1.5 px-1.5 uppercase text-slate-700 font-black">PB</td>
                                                             {reportData.global.platformStats.map((p, i) => (
-                                                                <td key={i} className="py-2 px-2 text-right">
+                                                                <td key={i} className="py-1.5 px-1.5 text-right">
                                                                     <div className="flex flex-col items-end gap-0.5">
-                                                                        <span className="font-black text-slate-900 text-[14px]">{p.payback.toFixed(1)}m</span>
+                                                                        <span className="font-black text-slate-900 text-[12px]">{p.payback.toFixed(1)}m</span>
                                                                         {renderTablePct(p.shifts?.mom?.payback, 'payback', p.payback)}
+                                                                    </div>
+                                                                </td>
+                                                            ))}
+                                                        </tr>
+                                                        <tr className="hover:bg-white transition-colors">
+                                                            <td className="py-1.5 px-1.5 uppercase text-slate-700 font-black">CM</td>
+                                                            {reportData.global.platformStats.map((p, i) => (
+                                                                <td key={i} className="py-1.5 px-1.5 text-right">
+                                                                    <div className="flex flex-col items-end gap-0.5">
+                                                                        <span className="font-black text-slate-900 text-[12px]">{fmtCompactCurr(p.cm)}</span>
+                                                                        {renderTablePct(p.shifts?.mom?.cm, 'cm', p.cm)}
                                                                     </div>
                                                                 </td>
                                                             ))}
@@ -741,7 +822,7 @@ Output as a JSON object with these EXACT keys:
                                             </h4>
                                             <textarea 
                                                 className="bg-transparent text-slate-700 w-full h-full resize-none outline-none font-medium text-[13px] leading-[1.6] placeholder:text-slate-400" 
-                                                placeholder="Enter plans for next month..."
+                                                placeholder="Plans for next month..."
                                                 value={narratives['GLOBAL_plan'] || ""}
                                                 onChange={e => setNarratives({...narratives, 'GLOBAL_plan': e.target.value})}
                                             />
@@ -751,40 +832,42 @@ Output as a JSON object with these EXACT keys:
                             </div>
                         )}
 
-                        {/* Slide 3.5: Google App Campaigns Overview */}
+                        {/* Slide 4.5: Google App Campaigns Overview */}
                         {reportData && gacGlobalStats && (
                             <div className="slide-container">
                                 <div className="flex justify-between items-start mb-4 w-full gap-3">
-                                    <div className="bg-wise-fast text-wise-forest font-black uppercase rounded-r-full flex flex-col justify-center -ml-[0.5cm] pl-[0.5cm] pr-10 py-2" style={{ fontSize: '2.1rem', lineHeight: '1.1' }}>
+                                    <div className="bg-[#FFA500] text-white font-black uppercase rounded-r-full flex flex-col justify-center -ml-[0.5cm] pl-[0.5cm] pr-8 py-2" style={{ fontSize: '1.8rem', lineHeight: '1.1' }}>
                                         <span className="tracking-tighter">GOOGLE APP CAMPAIGNS</span>
                                         <span className="tracking-tighter">PERFORMANCE</span>
                                     </div>
                                     
-                                    <div className="flex gap-2 flex-1 justify-end">
-                                        <MetricCard title="Spend" val={fmtCompactCurr(gacGlobalStats.spend)} mom={gacGlobalStats.shifts?.mom?.spend} yoy={gacGlobalStats.shifts?.yoy?.spend} inverse={false} rawVal={gacGlobalStats.spend} />
-                                        <MetricCard title="MNCs" val={fmtCompactNum(gacGlobalStats.mncs)} mom={gacGlobalStats.shifts?.mom?.mncs} yoy={gacGlobalStats.shifts?.yoy?.mncs} inverse={false} rawVal={gacGlobalStats.mncs} />
-                                        <MetricCard title="LTV" val={`£${gacGlobalStats.ltv.toFixed(2)}`} mom={gacGlobalStats.shifts?.mom?.ltv} yoy={gacGlobalStats.shifts?.yoy?.ltv} inverse={false} rawVal={gacGlobalStats.ltv} />
-                                        <MetricCard title="CPA" val={`£${gacGlobalStats.cpa.toFixed(0)}`} mom={gacGlobalStats.shifts?.mom?.cpa} yoy={gacGlobalStats.shifts?.yoy?.cpa} inverse={true} rawVal={gacGlobalStats.cpa} />
-                                        <MetricCard title="Payback" val={gacGlobalStats.payback.toFixed(1) + 'm'} mom={gacGlobalStats.shifts?.mom?.payback} yoy={gacGlobalStats.shifts?.yoy?.payback} inverse={true} rawVal={gacGlobalStats.payback} />
+                                    <div className="flex gap-1.5 flex-1 justify-end">
+                                        <MetricCard title="Spend" val={fmtCompactCurr(gacGlobalStats.spend)} mom={gacGlobalStats.shifts?.mom?.spend} yoy={gacGlobalStats.shifts?.yoy?.spend} inverse={false} rawVal={gacGlobalStats.spend} mainColor="text-[#FFA500]" labelColor="text-[#FFA500]/70" />
+                                        <MetricCard title="MNCs" val={fmtCompactNum(gacGlobalStats.mncs)} mom={gacGlobalStats.shifts?.mom?.mncs} yoy={gacGlobalStats.shifts?.yoy?.mncs} inverse={false} rawVal={gacGlobalStats.mncs} mainColor="text-[#FFA500]" labelColor="text-[#FFA500]/70" />
+                                        <MetricCard title="LTV" val={`£${gacGlobalStats.ltv.toFixed(2)}`} mom={gacGlobalStats.shifts?.mom?.ltv} yoy={gacGlobalStats.shifts?.yoy?.ltv} inverse={false} rawVal={gacGlobalStats.ltv} mainColor="text-[#FFA500]" labelColor="text-[#FFA500]/70" />
+                                        <MetricCard title="CPA" val={`£${gacGlobalStats.cpa.toFixed(2)}`} mom={gacGlobalStats.shifts?.mom?.cpa} yoy={gacGlobalStats.shifts?.yoy?.cpa} inverse={true} rawVal={gacGlobalStats.cpa} mainColor="text-[#FFA500]" labelColor="text-[#FFA500]/70" />
+                                        <MetricCard title="Payback" val={gacGlobalStats.payback.toFixed(1) + 'm'} mom={gacGlobalStats.shifts?.mom?.payback} yoy={gacGlobalStats.shifts?.yoy?.payback} inverse={true} rawVal={gacGlobalStats.payback} mainColor="text-[#FFA500]" labelColor="text-[#FFA500]/70" />
+                                        <MetricCard title="CM" val={fmtCompactCurr(gacGlobalStats.cm)} mom={gacGlobalStats.shifts?.mom?.cm} yoy={gacGlobalStats.shifts?.yoy?.cm} inverse={false} rawVal={gacGlobalStats.cm} mainColor="text-[#FFA500]" labelColor="text-[#FFA500]/70" />
                                     </div>
                                 </div>
                                 
                                 <div className="grid grid-cols-12 gap-4 flex-1 overflow-hidden min-h-0">
                                     <div className="col-span-5 flex flex-col h-full">
-                                        <div className="flex-1 bg-slate-50 border-2 border-white rounded-[2rem] p-4 shadow-inner flex flex-col relative overflow-hidden min-h-0">
+                                        <div className="flex-1 bg-slate-50 border-2 border-[#FFA500]/20 rounded-[2rem] p-4 shadow-inner flex flex-col relative overflow-hidden min-h-0">
                                             <h4 className="text-slate-400 text-[11px] font-black uppercase tracking-[0.3em] mb-2 flex items-center gap-2">
                                                 <Icons.Info size={16} /> Region Split
                                             </h4>
                                             <div className="flex-1 overflow-y-auto pr-2">
-                                                <table className="w-full text-[13px] font-bold border-collapse">
+                                                <table className="w-full text-[12px] font-bold border-collapse">
                                                     <thead className="text-slate-400 uppercase tracking-widest border-b-2 border-slate-200 sticky top-0 bg-slate-50 z-10">
                                                         <tr>
-                                                            <th className="py-1.5 px-2 text-left">Region</th>
-                                                            <th className="py-1.5 px-2 text-right">Spend</th>
-                                                            <th className="py-1.5 px-2 text-right">MNCs</th>
-                                                            <th className="py-1.5 px-2 text-right">LTV</th>
-                                                            <th className="py-1.5 px-2 text-right">CPA</th>
-                                                            <th className="py-1.5 px-2 text-right">PB</th>
+                                                            <th className="py-1 px-1 text-left">Region</th>
+                                                            <th className="py-1 px-1 text-right">Spend</th>
+                                                            <th className="py-1 px-1 text-right">MNCs</th>
+                                                            <th className="py-1 px-1 text-right">LTV</th>
+                                                            <th className="py-1 px-1 text-right">CPA</th>
+                                                            <th className="py-1 px-1 text-right">PB</th>
+                                                            <th className="py-1 px-1 text-right">CM</th>
                                                         </tr>
                                                     </thead>
                                                     <tbody className="divide-y-2 divide-slate-100">
@@ -793,35 +876,41 @@ Output as a JSON object with these EXACT keys:
                                                             if (!p || (p.mncs === 0 && p.spend === 0)) return null;
                                                             return (
                                                                 <tr key={i} className="hover:bg-white transition-colors">
-                                                                    <td className="py-2 px-2 uppercase text-slate-700 font-black">{reg.name}</td>
-                                                                    <td className="py-2 px-2 text-right">
+                                                                    <td className="py-1.5 px-1.5 uppercase text-slate-700 font-black">{reg.name}</td>
+                                                                    <td className="py-1.5 px-1.5 text-right">
                                                                         <div className="flex flex-col items-end gap-0.5">
-                                                                            <span className="font-black text-slate-900 text-[14px]">{fmtCompactCurr(p.spend)}</span>
+                                                                            <span className="font-black text-slate-900 text-[12px]">{fmtCompactCurr(p.spend)}</span>
                                                                             {renderTablePct(p.shifts?.mom?.spend, 'spend', p.spend)}
                                                                         </div>
                                                                     </td>
-                                                                    <td className="py-2 px-2 text-right">
+                                                                    <td className="py-1.5 px-1.5 text-right">
                                                                         <div className="flex flex-col items-end gap-0.5">
-                                                                            <span className="font-black text-slate-900 text-[14px]">{p.mncs.toLocaleString()}</span>
+                                                                            <span className="font-black text-slate-900 text-[12px]">{p.mncs.toLocaleString()}</span>
                                                                             {renderTablePct(p.shifts?.mom?.mncs, 'mncs', p.mncs)}
                                                                         </div>
                                                                     </td>
-                                                                    <td className="py-2 px-2 text-right">
+                                                                    <td className="py-1.5 px-1.5 text-right">
                                                                         <div className="flex flex-col items-end gap-0.5">
-                                                                            <span className="font-black text-slate-900 text-[14px]">£{p.ltv.toFixed(2)}</span>
+                                                                            <span className="font-black text-slate-900 text-[12px]">£{p.ltv.toFixed(2)}</span>
                                                                             {renderTablePct(p.shifts?.mom?.ltv, 'ltv', p.ltv)}
                                                                         </div>
                                                                     </td>
-                                                                    <td className="py-2 px-2 text-right">
+                                                                    <td className="py-1.5 px-1.5 text-right">
                                                                         <div className="flex flex-col items-end gap-0.5">
-                                                                            <span className="font-black text-slate-900 text-[14px]">£{p.cpa.toFixed(0)}</span>
+                                                                            <span className="font-black text-slate-900 text-[12px]">£{p.cpa.toFixed(2)}</span>
                                                                             {renderTablePct(p.shifts?.mom?.cpa, 'cpa', p.cpa)}
                                                                         </div>
                                                                     </td>
-                                                                    <td className="py-2 px-2 text-right">
+                                                                    <td className="py-1.5 px-1.5 text-right">
                                                                         <div className="flex flex-col items-end gap-0.5">
-                                                                            <span className="font-black text-slate-900 text-[14px]">{p.payback.toFixed(1)}m</span>
+                                                                            <span className="font-black text-slate-900 text-[12px]">{p.payback.toFixed(1)}m</span>
                                                                             {renderTablePct(p.shifts?.mom?.payback, 'payback', p.payback)}
+                                                                        </div>
+                                                                    </td>
+                                                                    <td className="py-1.5 px-1.5 text-right">
+                                                                        <div className="flex flex-col items-end gap-0.5">
+                                                                            <span className="font-black text-slate-900 text-[12px]">{fmtCompactCurr(p.cm)}</span>
+                                                                            {renderTablePct(p.shifts?.mom?.cm, 'cm', p.cm)}
                                                                         </div>
                                                                     </td>
                                                                 </tr>
@@ -830,19 +919,27 @@ Output as a JSON object with these EXACT keys:
                                                     </tbody>
                                                 </table>
                                             </div>
-                                            <div className="text-[10px] text-slate-400 font-semibold italic text-right px-2 mt-2">
-                                                * All percentage shifts indicate Month-over-Month (MoM) comparisons.
+                                            <div className="flex justify-between items-end px-2 mt-2">
+                                                <svg className="h-8 w-8" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                                                    <path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" fill="#4285F4"/>
+                                                    <path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.16v2.84C3.99 20.53 7.7 23 12 23z" fill="#34A853"/>
+                                                    <path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.16C1.43 8.55 1 10.22 1 12s.43 3.45 1.16 4.93l3.68-2.84z" fill="#FBBC05"/>
+                                                    <path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.16 7.07l3.68 2.84c.87-2.6 3.3-4.53 6.16-4.53z" fill="#EA4335"/>
+                                                </svg>
+                                                <div className="text-[10px] text-slate-400 font-semibold italic text-right">
+                                                    * All percentage shifts indicate Month-over-Month (MoM) comparisons.
+                                                </div>
                                             </div>
                                         </div>
                                     </div>
                                     <div className="col-span-7 flex flex-col gap-4 h-full">
-                                        <div className="flex-1 bg-wise-forest rounded-[2rem] p-6 shadow-2xl flex flex-col relative overflow-hidden h-full">
-                                            <div className="absolute -top-16 -right-16 p-12 opacity-5"><Icons.Zap size={300} className="text-white" /></div>
-                                            <h4 className="text-wise-fast text-[12px] font-black uppercase tracking-[0.4em] mb-4 flex items-center gap-2">
+                                        <div className="flex-1 bg-[#fff8eb] border-2 border-[#FFA500]/20 rounded-[2rem] p-6 shadow-2xl flex flex-col relative overflow-hidden h-full">
+                                            <div className="absolute -top-16 -right-16 p-12 opacity-5"><Icons.Zap size={300} className="text-[#FFA500]" /></div>
+                                            <h4 className="text-[#FFA500] text-[12px] font-black uppercase tracking-[0.4em] mb-4 flex items-center gap-2">
                                                 <Icons.Zap size={18} /> Performance
                                             </h4>
                                             <textarea 
-                                                className="bg-transparent text-white w-full h-full resize-none outline-none font-medium text-[14px] leading-[1.6] placeholder:text-white/20 relative z-10" 
+                                                className="bg-transparent text-slate-800 w-full h-full resize-none outline-none font-medium text-[14px] leading-[1.6] placeholder:text-slate-400 relative z-10" 
                                                 placeholder="Enter Google App Campaigns performance notes..."
                                                 value={narratives['GAC_perf'] !== undefined ? narratives['GAC_perf'] : defaultGACPerfText} 
                                                 onChange={e => setNarratives({...narratives, 'GAC_perf': e.target.value})}
@@ -855,7 +952,7 @@ Output as a JSON object with these EXACT keys:
                                             </h4>
                                             <textarea 
                                                 className="bg-transparent text-slate-700 w-full h-full resize-none outline-none font-medium text-[13px] leading-[1.6] placeholder:text-slate-400" 
-                                                placeholder="Enter Google App Campaigns plans for next month..."
+                                                placeholder="Google App Campaigns plans for next month..."
                                                 value={narratives['GAC_plan'] || ""}
                                                 onChange={e => setNarratives({...narratives, 'GAC_plan': e.target.value})}
                                             />
@@ -865,40 +962,42 @@ Output as a JSON object with these EXACT keys:
                             </div>
                         )}
 
-                        {/* Slide 3.6: Moloco Overview */}
+                        {/* Slide 4.6: Moloco Overview */}
                         {reportData && molocoGlobalStats && (
                             <div className="slide-container">
                                 <div className="flex justify-between items-start mb-4 w-full gap-3">
-                                    <div className="bg-wise-fast text-wise-forest font-black uppercase rounded-r-full flex flex-col justify-center -ml-[0.5cm] pl-[0.5cm] pr-10 py-2" style={{ fontSize: '2rem', lineHeight: '1.1' }}>
+                                    <div className="bg-[#2C7CF5] text-white font-black uppercase rounded-r-full flex flex-col justify-center -ml-[0.5cm] pl-[0.5cm] pr-8 py-2" style={{ fontSize: '2rem', lineHeight: '1.1' }}>
                                         <span className="tracking-tighter">MOLOCO</span>
                                         <span className="tracking-tighter">PERFORMANCE</span>
                                     </div>
                                     
-                                    <div className="flex gap-2 flex-1 justify-end">
-                                        <MetricCard title="Spend" val={fmtCompactCurr(molocoGlobalStats.spend)} mom={molocoGlobalStats.shifts?.mom?.spend} yoy={molocoGlobalStats.shifts?.yoy?.spend} inverse={false} rawVal={molocoGlobalStats.spend} />
-                                        <MetricCard title="MNCs" val={fmtCompactNum(molocoGlobalStats.mncs)} mom={molocoGlobalStats.shifts?.mom?.mncs} yoy={molocoGlobalStats.shifts?.yoy?.mncs} inverse={false} rawVal={molocoGlobalStats.mncs} />
-                                        <MetricCard title="LTV" val={`£${molocoGlobalStats.ltv.toFixed(2)}`} mom={molocoGlobalStats.shifts?.mom?.ltv} yoy={molocoGlobalStats.shifts?.yoy?.ltv} inverse={false} rawVal={molocoGlobalStats.ltv} />
-                                        <MetricCard title="CPA" val={`£${molocoGlobalStats.cpa.toFixed(0)}`} mom={molocoGlobalStats.shifts?.mom?.cpa} yoy={molocoGlobalStats.shifts?.yoy?.cpa} inverse={true} rawVal={molocoGlobalStats.cpa} />
-                                        <MetricCard title="Payback" val={molocoGlobalStats.payback.toFixed(1) + 'm'} mom={molocoGlobalStats.shifts?.mom?.payback} yoy={molocoGlobalStats.shifts?.yoy?.payback} inverse={true} rawVal={molocoGlobalStats.payback} />
+                                    <div className="flex gap-1.5 flex-1 justify-end">
+                                        <MetricCard title="Spend" val={fmtCompactCurr(molocoGlobalStats.spend)} mom={molocoGlobalStats.shifts?.mom?.spend} yoy={molocoGlobalStats.shifts?.yoy?.spend} inverse={false} rawVal={molocoGlobalStats.spend} mainColor="text-[#2C7CF5]" labelColor="text-[#2C7CF5]/70" />
+                                        <MetricCard title="MNCs" val={fmtCompactNum(molocoGlobalStats.mncs)} mom={molocoGlobalStats.shifts?.mom?.mncs} yoy={molocoGlobalStats.shifts?.yoy?.mncs} inverse={false} rawVal={molocoGlobalStats.mncs} mainColor="text-[#2C7CF5]" labelColor="text-[#2C7CF5]/70" />
+                                        <MetricCard title="LTV" val={`£${molocoGlobalStats.ltv.toFixed(2)}`} mom={molocoGlobalStats.shifts?.mom?.ltv} yoy={molocoGlobalStats.shifts?.yoy?.ltv} inverse={false} rawVal={molocoGlobalStats.ltv} mainColor="text-[#2C7CF5]" labelColor="text-[#2C7CF5]/70" />
+                                        <MetricCard title="CPA" val={`£${molocoGlobalStats.cpa.toFixed(2)}`} mom={molocoGlobalStats.shifts?.mom?.cpa} yoy={molocoGlobalStats.shifts?.yoy?.cpa} inverse={true} rawVal={molocoGlobalStats.cpa} mainColor="text-[#2C7CF5]" labelColor="text-[#2C7CF5]/70" />
+                                        <MetricCard title="Payback" val={molocoGlobalStats.payback.toFixed(1) + 'm'} mom={molocoGlobalStats.shifts?.mom?.payback} yoy={molocoGlobalStats.shifts?.yoy?.payback} inverse={true} rawVal={molocoGlobalStats.payback} mainColor="text-[#2C7CF5]" labelColor="text-[#2C7CF5]/70" />
+                                        <MetricCard title="CM" val={fmtCompactCurr(molocoGlobalStats.cm)} mom={molocoGlobalStats.shifts?.mom?.cm} yoy={molocoGlobalStats.shifts?.yoy?.cm} inverse={false} rawVal={molocoGlobalStats.cm} mainColor="text-[#2C7CF5]" labelColor="text-[#2C7CF5]/70" />
                                     </div>
                                 </div>
                                 
                                 <div className="grid grid-cols-12 gap-4 flex-1 overflow-hidden min-h-0">
                                     <div className="col-span-5 flex flex-col h-full">
-                                        <div className="flex-1 bg-slate-50 border-2 border-white rounded-[2rem] p-4 shadow-inner flex flex-col relative overflow-hidden min-h-0">
+                                        <div className="flex-1 bg-slate-50 border-2 border-[#2C7CF5]/20 rounded-[2rem] p-4 shadow-inner flex flex-col relative overflow-hidden min-h-0">
                                             <h4 className="text-slate-400 text-[11px] font-black uppercase tracking-[0.3em] mb-2 flex items-center gap-2">
                                                 <Icons.Info size={16} /> Region Split
                                             </h4>
                                             <div className="flex-1 overflow-y-auto pr-2">
-                                                <table className="w-full text-[13px] font-bold border-collapse">
+                                                <table className="w-full text-[12px] font-bold border-collapse">
                                                     <thead className="text-slate-400 uppercase tracking-widest border-b-2 border-slate-200 sticky top-0 bg-slate-50 z-10">
                                                         <tr>
-                                                            <th className="py-1.5 px-2 text-left">Region</th>
-                                                            <th className="py-1.5 px-2 text-right">Spend</th>
-                                                            <th className="py-1.5 px-2 text-right">MNCs</th>
-                                                            <th className="py-1.5 px-2 text-right">LTV</th>
-                                                            <th className="py-1.5 px-2 text-right">CPA</th>
-                                                            <th className="py-1.5 px-2 text-right">PB</th>
+                                                            <th className="py-1 px-1 text-left">Region</th>
+                                                            <th className="py-1 px-1 text-right">Spend</th>
+                                                            <th className="py-1 px-1 text-right">MNCs</th>
+                                                            <th className="py-1 px-1 text-right">LTV</th>
+                                                            <th className="py-1 px-1 text-right">CPA</th>
+                                                            <th className="py-1 px-1 text-right">PB</th>
+                                                            <th className="py-1 px-1 text-right">CM</th>
                                                         </tr>
                                                     </thead>
                                                     <tbody className="divide-y-2 divide-slate-100">
@@ -907,35 +1006,41 @@ Output as a JSON object with these EXACT keys:
                                                             if (!p || (p.mncs === 0 && p.spend === 0)) return null;
                                                             return (
                                                                 <tr key={i} className="hover:bg-white transition-colors">
-                                                                    <td className="py-2 px-2 uppercase text-slate-700 font-black">{reg.name}</td>
-                                                                    <td className="py-2 px-2 text-right">
+                                                                    <td className="py-1.5 px-1.5 uppercase text-slate-700 font-black">{reg.name}</td>
+                                                                    <td className="py-1.5 px-1.5 text-right">
                                                                         <div className="flex flex-col items-end gap-0.5">
-                                                                            <span className="font-black text-slate-900 text-[14px]">{fmtCompactCurr(p.spend)}</span>
+                                                                            <span className="font-black text-slate-900 text-[12px]">{fmtCompactCurr(p.spend)}</span>
                                                                             {renderTablePct(p.shifts?.mom?.spend, 'spend', p.spend)}
                                                                         </div>
                                                                     </td>
-                                                                    <td className="py-2 px-2 text-right">
+                                                                    <td className="py-1.5 px-1.5 text-right">
                                                                         <div className="flex flex-col items-end gap-0.5">
-                                                                            <span className="font-black text-slate-900 text-[14px]">{p.mncs.toLocaleString()}</span>
+                                                                            <span className="font-black text-slate-900 text-[12px]">{p.mncs.toLocaleString()}</span>
                                                                             {renderTablePct(p.shifts?.mom?.mncs, 'mncs', p.mncs)}
                                                                         </div>
                                                                     </td>
-                                                                    <td className="py-2 px-2 text-right">
+                                                                    <td className="py-1.5 px-1.5 text-right">
                                                                         <div className="flex flex-col items-end gap-0.5">
-                                                                            <span className="font-black text-slate-900 text-[14px]">£{p.ltv.toFixed(2)}</span>
+                                                                            <span className="font-black text-slate-900 text-[12px]">£{p.ltv.toFixed(2)}</span>
                                                                             {renderTablePct(p.shifts?.mom?.ltv, 'ltv', p.ltv)}
                                                                         </div>
                                                                     </td>
-                                                                    <td className="py-2 px-2 text-right">
+                                                                    <td className="py-1.5 px-1.5 text-right">
                                                                         <div className="flex flex-col items-end gap-0.5">
-                                                                            <span className="font-black text-slate-900 text-[14px]">£{p.cpa.toFixed(0)}</span>
+                                                                            <span className="font-black text-slate-900 text-[12px]">£{p.cpa.toFixed(2)}</span>
                                                                             {renderTablePct(p.shifts?.mom?.cpa, 'cpa', p.cpa)}
                                                                         </div>
                                                                     </td>
-                                                                    <td className="py-2 px-2 text-right">
+                                                                    <td className="py-1.5 px-1.5 text-right">
                                                                         <div className="flex flex-col items-end gap-0.5">
-                                                                            <span className="font-black text-slate-900 text-[14px]">{p.payback.toFixed(1)}m</span>
+                                                                            <span className="font-black text-slate-900 text-[12px]">{p.payback.toFixed(1)}m</span>
                                                                             {renderTablePct(p.shifts?.mom?.payback, 'payback', p.payback)}
+                                                                        </div>
+                                                                    </td>
+                                                                    <td className="py-1.5 px-1.5 text-right">
+                                                                        <div className="flex flex-col items-end gap-0.5">
+                                                                            <span className="font-black text-slate-900 text-[12px]">{fmtCompactCurr(p.cm)}</span>
+                                                                            {renderTablePct(p.shifts?.mom?.cm, 'cm', p.cm)}
                                                                         </div>
                                                                     </td>
                                                                 </tr>
@@ -944,19 +1049,24 @@ Output as a JSON object with these EXACT keys:
                                                     </tbody>
                                                 </table>
                                             </div>
-                                            <div className="text-[10px] text-slate-400 font-semibold italic text-right px-2 mt-2">
-                                                * All percentage shifts indicate Month-over-Month (MoM) comparisons.
+                                            <div className="flex justify-between items-end px-2 mt-2">
+                                                <svg className="h-8 w-8" viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg">
+                                                    <path d="M 45 80 H 35 C 10 80 10 40 30 35 C 35 10 75 10 80 35 C 100 40 100 80 85 80 H 70 V 55 L 57.5 70 L 45 55 V 80 Z" fill="none" stroke="#0066FF" strokeWidth="10" strokeLinecap="round" strokeLinejoin="round"/>
+                                                </svg>
+                                                <div className="text-[10px] text-slate-400 font-semibold italic text-right">
+                                                    * All percentage shifts indicate Month-over-Month (MoM) comparisons.
+                                                </div>
                                             </div>
                                         </div>
                                     </div>
                                     <div className="col-span-7 flex flex-col gap-4 h-full">
-                                        <div className="flex-1 bg-wise-forest rounded-[2rem] p-6 shadow-2xl flex flex-col relative overflow-hidden h-full">
-                                            <div className="absolute -top-16 -right-16 p-12 opacity-5"><Icons.Zap size={300} className="text-white" /></div>
-                                            <h4 className="text-wise-fast text-[12px] font-black uppercase tracking-[0.4em] mb-4 flex items-center gap-2">
+                                        <div className="flex-1 bg-[#eef5ff] border-2 border-[#2C7CF5]/20 rounded-[2rem] p-6 shadow-2xl flex flex-col relative overflow-hidden h-full">
+                                            <div className="absolute -top-16 -right-16 p-12 opacity-5"><Icons.Zap size={300} className="text-[#2C7CF5]" /></div>
+                                            <h4 className="text-[#2C7CF5] text-[12px] font-black uppercase tracking-[0.4em] mb-4 flex items-center gap-2">
                                                 <Icons.Zap size={18} /> Performance
                                             </h4>
                                             <textarea 
-                                                className="bg-transparent text-white w-full h-full resize-none outline-none font-medium text-[14px] leading-[1.6] placeholder:text-white/20 relative z-10" 
+                                                className="bg-transparent text-slate-800 w-full h-full resize-none outline-none font-medium text-[14px] leading-[1.6] placeholder:text-slate-400 relative z-10" 
                                                 placeholder="Enter Moloco performance notes..."
                                                 value={narratives['MOLOCO_perf'] !== undefined ? narratives['MOLOCO_perf'] : defaultMolocoPerfText} 
                                                 onChange={e => setNarratives({...narratives, 'MOLOCO_perf': e.target.value})}
@@ -969,7 +1079,7 @@ Output as a JSON object with these EXACT keys:
                                             </h4>
                                             <textarea 
                                                 className="bg-transparent text-slate-700 w-full h-full resize-none outline-none font-medium text-[13px] leading-[1.6] placeholder:text-slate-400" 
-                                                placeholder="Enter Moloco plans for next month..."
+                                                placeholder="Moloco plans for next month..."
                                                 value={narratives['MOLOCO_plan'] || ""}
                                                 onChange={e => setNarratives({...narratives, 'MOLOCO_plan': e.target.value})}
                                             />
@@ -979,40 +1089,42 @@ Output as a JSON object with these EXACT keys:
                             </div>
                         )}
 
-                        {/* Slide 3.7: TTD Overview */}
+                        {/* Slide 4.7: TTD Overview */}
                         {reportData && ttdGlobalStats && (
                             <div className="slide-container">
                                 <div className="flex justify-between items-start mb-4 w-full gap-3">
-                                    <div className="bg-wise-fast text-wise-forest font-black uppercase rounded-r-full flex flex-col justify-center -ml-[0.5cm] pl-[0.5cm] pr-10 py-2" style={{ fontSize: '2rem', lineHeight: '1.1' }}>
+                                    <div className="bg-[#1d9ad6] text-white font-black uppercase rounded-r-full flex flex-col justify-center -ml-[0.5cm] pl-[0.5cm] pr-8 py-2" style={{ fontSize: '2rem', lineHeight: '1.1' }}>
                                         <span className="tracking-tighter">THE TRADE DESK</span>
                                         <span className="tracking-tighter">PERFORMANCE</span>
                                     </div>
                                     
-                                    <div className="flex gap-2 flex-1 justify-end">
-                                        <MetricCard title="Spend" val={fmtCompactCurr(ttdGlobalStats.spend)} mom={ttdGlobalStats.shifts?.mom?.spend} yoy={ttdGlobalStats.shifts?.yoy?.spend} inverse={false} rawVal={ttdGlobalStats.spend} />
-                                        <MetricCard title="MNCs" val={fmtCompactNum(ttdGlobalStats.mncs)} mom={ttdGlobalStats.shifts?.mom?.mncs} yoy={ttdGlobalStats.shifts?.yoy?.mncs} inverse={false} rawVal={ttdGlobalStats.mncs} />
-                                        <MetricCard title="LTV" val={`£${ttdGlobalStats.ltv.toFixed(2)}`} mom={ttdGlobalStats.shifts?.mom?.ltv} yoy={ttdGlobalStats.shifts?.yoy?.ltv} inverse={false} rawVal={ttdGlobalStats.ltv} />
-                                        <MetricCard title="CPA" val={`£${ttdGlobalStats.cpa.toFixed(0)}`} mom={ttdGlobalStats.shifts?.mom?.cpa} yoy={ttdGlobalStats.shifts?.yoy?.cpa} inverse={true} rawVal={ttdGlobalStats.cpa} />
-                                        <MetricCard title="Payback" val={ttdGlobalStats.payback.toFixed(1) + 'm'} mom={ttdGlobalStats.shifts?.mom?.payback} yoy={ttdGlobalStats.shifts?.yoy?.payback} inverse={true} rawVal={ttdGlobalStats.payback} />
+                                    <div className="flex gap-1.5 flex-1 justify-end">
+                                        <MetricCard title="Spend" val={fmtCompactCurr(ttdGlobalStats.spend)} mom={ttdGlobalStats.shifts?.mom?.spend} yoy={ttdGlobalStats.shifts?.yoy?.spend} inverse={false} rawVal={ttdGlobalStats.spend} mainColor="text-[#1d9ad6]" labelColor="text-[#1d9ad6]/70" />
+                                        <MetricCard title="MNCs" val={fmtCompactNum(ttdGlobalStats.mncs)} mom={ttdGlobalStats.shifts?.mom?.mncs} yoy={ttdGlobalStats.shifts?.yoy?.mncs} inverse={false} rawVal={ttdGlobalStats.mncs} mainColor="text-[#1d9ad6]" labelColor="text-[#1d9ad6]/70" />
+                                        <MetricCard title="LTV" val={`£${ttdGlobalStats.ltv.toFixed(2)}`} mom={ttdGlobalStats.shifts?.mom?.ltv} yoy={ttdGlobalStats.shifts?.yoy?.ltv} inverse={false} rawVal={ttdGlobalStats.ltv} mainColor="text-[#1d9ad6]" labelColor="text-[#1d9ad6]/70" />
+                                        <MetricCard title="CPA" val={`£${ttdGlobalStats.cpa.toFixed(2)}`} mom={ttdGlobalStats.shifts?.mom?.cpa} yoy={ttdGlobalStats.shifts?.yoy?.cpa} inverse={true} rawVal={ttdGlobalStats.cpa} mainColor="text-[#1d9ad6]" labelColor="text-[#1d9ad6]/70" />
+                                        <MetricCard title="Payback" val={ttdGlobalStats.payback.toFixed(1) + 'm'} mom={ttdGlobalStats.shifts?.mom?.payback} yoy={ttdGlobalStats.shifts?.yoy?.payback} inverse={true} rawVal={ttdGlobalStats.payback} mainColor="text-[#1d9ad6]" labelColor="text-[#1d9ad6]/70" />
+                                        <MetricCard title="CM" val={fmtCompactCurr(ttdGlobalStats.cm)} mom={ttdGlobalStats.shifts?.mom?.cm} yoy={ttdGlobalStats.shifts?.yoy?.cm} inverse={false} rawVal={ttdGlobalStats.cm} mainColor="text-[#1d9ad6]" labelColor="text-[#1d9ad6]/70" />
                                     </div>
                                 </div>
                                 
                                 <div className="grid grid-cols-12 gap-4 flex-1 overflow-hidden min-h-0">
                                     <div className="col-span-5 flex flex-col h-full">
-                                        <div className="flex-1 bg-slate-50 border-2 border-white rounded-[2rem] p-4 shadow-inner flex flex-col relative overflow-hidden min-h-0">
+                                        <div className="flex-1 bg-slate-50 border-2 border-[#1d9ad6]/20 rounded-[2rem] p-4 shadow-inner flex flex-col relative overflow-hidden min-h-0">
                                             <h4 className="text-slate-400 text-[11px] font-black uppercase tracking-[0.3em] mb-2 flex items-center gap-2">
                                                 <Icons.Info size={16} /> Region Split
                                             </h4>
                                             <div className="flex-1 overflow-y-auto pr-2">
-                                                <table className="w-full text-[13px] font-bold border-collapse">
+                                                <table className="w-full text-[12px] font-bold border-collapse">
                                                     <thead className="text-slate-400 uppercase tracking-widest border-b-2 border-slate-200 sticky top-0 bg-slate-50 z-10">
                                                         <tr>
-                                                            <th className="py-1.5 px-2 text-left">Region</th>
-                                                            <th className="py-1.5 px-2 text-right">Spend</th>
-                                                            <th className="py-1.5 px-2 text-right">MNCs</th>
-                                                            <th className="py-1.5 px-2 text-right">LTV</th>
-                                                            <th className="py-1.5 px-2 text-right">CPA</th>
-                                                            <th className="py-1.5 px-2 text-right">PB</th>
+                                                            <th className="py-1 px-1 text-left">Region</th>
+                                                            <th className="py-1 px-1 text-right">Spend</th>
+                                                            <th className="py-1 px-1 text-right">MNCs</th>
+                                                            <th className="py-1 px-1 text-right">LTV</th>
+                                                            <th className="py-1 px-1 text-right">CPA</th>
+                                                            <th className="py-1 px-1 text-right">PB</th>
+                                                            <th className="py-1 px-1 text-right">CM</th>
                                                         </tr>
                                                     </thead>
                                                     <tbody className="divide-y-2 divide-slate-100">
@@ -1021,35 +1133,41 @@ Output as a JSON object with these EXACT keys:
                                                             if (!p || (p.mncs === 0 && p.spend === 0)) return null;
                                                             return (
                                                                 <tr key={i} className="hover:bg-white transition-colors">
-                                                                    <td className="py-2 px-2 uppercase text-slate-700 font-black">{reg.name}</td>
-                                                                    <td className="py-2 px-2 text-right">
+                                                                    <td className="py-1.5 px-1.5 uppercase text-slate-700 font-black">{reg.name}</td>
+                                                                    <td className="py-1.5 px-1.5 text-right">
                                                                         <div className="flex flex-col items-end gap-0.5">
-                                                                            <span className="font-black text-slate-900 text-[14px]">{fmtCompactCurr(p.spend)}</span>
+                                                                            <span className="font-black text-slate-900 text-[12px]">{fmtCompactCurr(p.spend)}</span>
                                                                             {renderTablePct(p.shifts?.mom?.spend, 'spend', p.spend)}
                                                                         </div>
                                                                     </td>
-                                                                    <td className="py-2 px-2 text-right">
+                                                                    <td className="py-1.5 px-1.5 text-right">
                                                                         <div className="flex flex-col items-end gap-0.5">
-                                                                            <span className="font-black text-slate-900 text-[14px]">{p.mncs.toLocaleString()}</span>
+                                                                            <span className="font-black text-slate-900 text-[12px]">{p.mncs.toLocaleString()}</span>
                                                                             {renderTablePct(p.shifts?.mom?.mncs, 'mncs', p.mncs)}
                                                                         </div>
                                                                     </td>
-                                                                    <td className="py-2 px-2 text-right">
+                                                                    <td className="py-1.5 px-1.5 text-right">
                                                                         <div className="flex flex-col items-end gap-0.5">
-                                                                            <span className="font-black text-slate-900 text-[14px]">£{p.ltv.toFixed(2)}</span>
+                                                                            <span className="font-black text-slate-900 text-[12px]">£{p.ltv.toFixed(2)}</span>
                                                                             {renderTablePct(p.shifts?.mom?.ltv, 'ltv', p.ltv)}
                                                                         </div>
                                                                     </td>
-                                                                    <td className="py-2 px-2 text-right">
+                                                                    <td className="py-1.5 px-1.5 text-right">
                                                                         <div className="flex flex-col items-end gap-0.5">
-                                                                            <span className="font-black text-slate-900 text-[14px]">£{p.cpa.toFixed(0)}</span>
+                                                                            <span className="font-black text-slate-900 text-[12px]">£{p.cpa.toFixed(2)}</span>
                                                                             {renderTablePct(p.shifts?.mom?.cpa, 'cpa', p.cpa)}
                                                                         </div>
                                                                     </td>
-                                                                    <td className="py-2 px-2 text-right">
+                                                                    <td className="py-1.5 px-1.5 text-right">
                                                                         <div className="flex flex-col items-end gap-0.5">
-                                                                            <span className="font-black text-slate-900 text-[14px]">{p.payback.toFixed(1)}m</span>
+                                                                            <span className="font-black text-slate-900 text-[12px]">{p.payback.toFixed(1)}m</span>
                                                                             {renderTablePct(p.shifts?.mom?.payback, 'payback', p.payback)}
+                                                                        </div>
+                                                                    </td>
+                                                                    <td className="py-1.5 px-1.5 text-right">
+                                                                        <div className="flex flex-col items-end gap-0.5">
+                                                                            <span className="font-black text-slate-900 text-[12px]">{fmtCompactCurr(p.cm)}</span>
+                                                                            {renderTablePct(p.shifts?.mom?.cm, 'cm', p.cm)}
                                                                         </div>
                                                                     </td>
                                                                 </tr>
@@ -1058,19 +1176,25 @@ Output as a JSON object with these EXACT keys:
                                                     </tbody>
                                                 </table>
                                             </div>
-                                            <div className="text-[10px] text-slate-400 font-semibold italic text-right px-2 mt-2">
-                                                * All percentage shifts indicate Month-over-Month (MoM) comparisons.
+                                            <div className="flex justify-between items-end px-2 mt-2">
+                                                <svg className="h-8 w-8" viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg">
+                                                    <path d="M30 18 h25 v44 h-13 v-30 h-12 z" fill="#1BA0D7"/>
+                                                    <path d="M68 22 A 38 38 0 1 1 22 72 L 32 62 A 24 24 0 1 0 54 36 Z" fill="#1BA0D7"/>
+                                                </svg>
+                                                <div className="text-[10px] text-slate-400 font-semibold italic text-right">
+                                                    * All percentage shifts indicate Month-over-Month (MoM) comparisons.
+                                                </div>
                                             </div>
                                         </div>
                                     </div>
                                     <div className="col-span-7 flex flex-col gap-4 h-full">
-                                        <div className="flex-1 bg-wise-forest rounded-[2rem] p-6 shadow-2xl flex flex-col relative overflow-hidden h-full">
-                                            <div className="absolute -top-16 -right-16 p-12 opacity-5"><Icons.Zap size={300} className="text-white" /></div>
-                                            <h4 className="text-wise-fast text-[12px] font-black uppercase tracking-[0.4em] mb-4 flex items-center gap-2">
+                                        <div className="flex-1 bg-[#ecf7fd] border-2 border-[#1d9ad6]/20 rounded-[2rem] p-6 shadow-2xl flex flex-col relative overflow-hidden h-full">
+                                            <div className="absolute -top-16 -right-16 p-12 opacity-5"><Icons.Zap size={300} className="text-[#1d9ad6]" /></div>
+                                            <h4 className="text-[#1d9ad6] text-[12px] font-black uppercase tracking-[0.4em] mb-4 flex items-center gap-2">
                                                 <Icons.Zap size={18} /> Performance
                                             </h4>
                                             <textarea 
-                                                className="bg-transparent text-white w-full h-full resize-none outline-none font-medium text-[14px] leading-[1.6] placeholder:text-white/20 relative z-10" 
+                                                className="bg-transparent text-slate-800 w-full h-full resize-none outline-none font-medium text-[14px] leading-[1.6] placeholder:text-slate-400 relative z-10" 
                                                 placeholder="Enter The Trade Desk performance notes..."
                                                 value={narratives['TTD_perf'] !== undefined ? narratives['TTD_perf'] : defaultTTDPerfText} 
                                                 onChange={e => setNarratives({...narratives, 'TTD_perf': e.target.value})}
@@ -1083,7 +1207,7 @@ Output as a JSON object with these EXACT keys:
                                             </h4>
                                             <textarea 
                                                 className="bg-transparent text-slate-700 w-full h-full resize-none outline-none font-medium text-[13px] leading-[1.6] placeholder:text-slate-400" 
-                                                placeholder="Enter The Trade Desk plans for next month..."
+                                                placeholder="The Trade Desk plans for next month..."
                                                 value={narratives['TTD_plan'] || ""}
                                                 onChange={e => setNarratives({...narratives, 'TTD_plan': e.target.value})}
                                             />
@@ -1093,7 +1217,7 @@ Output as a JSON object with these EXACT keys:
                             </div>
                         )}
                         
-                        {/* Slide 4: Section Divider - Regional Performance */}
+                        {/* Slide 5: Section Divider - Regional Performance */}
                         <div className="slide-container bg-wise-fast overflow-hidden relative">
                             <h1 className="text-wise-forest font-black uppercase tracking-tighter" style={{ fontSize: '8.5rem', lineHeight: '0.9' }}>
                                 REGIONAL<br/>PERFORMANCE
@@ -1111,16 +1235,20 @@ Output as a JSON object with these EXACT keys:
                                 
                                 {/* Regional Header Section */}
                                 <div className="flex justify-between items-start mb-4 w-full gap-3">
-                                    <div className="bg-wise-fast text-wise-forest font-black uppercase rounded-r-full flex items-center -ml-[0.5cm] pl-[0.5cm] pr-10 py-2" style={{ fontSize: '3rem', lineHeight: '1' }}>
-                                        <span className="tracking-tighter">{reg.name}</span>
+                                    <div className="bg-wise-fast text-wise-forest font-black uppercase rounded-r-full flex flex-col justify-center -ml-[0.5cm] pl-[0.5cm] pr-10 py-2" style={{ lineHeight: '1' }}>
+                                        <span className="tracking-tighter" style={{ fontSize: '3rem' }}>{reg.name}</span>
+                                        {getRegionSubtitle(reg.name) && (
+                                            <span className="text-[18px] opacity-90 mt-2 leading-tight tracking-[0.1em]">{getRegionSubtitle(reg.name)}</span>
+                                        )}
                                     </div>
                                     
-                                    <div className="flex gap-2 flex-1 justify-end">
+                                    <div className="flex gap-1.5 flex-1 justify-end">
                                         <MetricCard title="Spend" val={fmtCompactCurr(reg.stats.spend)} mom={reg.shifts.mom.spend} yoy={reg.shifts.yoy.spend} inverse={false} rawVal={reg.stats.spend} />
                                         <MetricCard title="MNCs" val={fmtCompactNum(reg.stats.mncs)} mom={reg.shifts.mom.mncs} yoy={reg.shifts.yoy.mncs} inverse={false} rawVal={reg.stats.mncs} />
                                         <MetricCard title="LTV" val={`£${reg.stats.ltv.toFixed(2)}`} mom={reg.shifts.mom.ltv} yoy={reg.shifts.yoy.ltv} inverse={false} rawVal={reg.stats.ltv} />
-                                        <MetricCard title="CPA" val={`£${reg.stats.cpa.toFixed(0)}`} mom={reg.shifts.mom.cpa} yoy={reg.shifts.yoy.cpa} inverse={true} rawVal={reg.stats.cpa} />
+                                        <MetricCard title="CPA" val={`£${reg.stats.cpa.toFixed(2)}`} mom={reg.shifts.mom.cpa} yoy={reg.shifts.yoy.cpa} inverse={true} rawVal={reg.stats.cpa} />
                                         <MetricCard title="Payback" val={reg.stats.payback.toFixed(1) + 'm'} mom={reg.shifts.mom.payback} yoy={reg.shifts.yoy.payback} inverse={true} rawVal={reg.stats.payback} />
+                                        <MetricCard title="CM" val={fmtCompactCurr(reg.stats.cm)} mom={reg.shifts.mom.cm} yoy={reg.shifts.yoy.cm} inverse={false} rawVal={reg.stats.cm} />
                                     </div>
                                 </div>
                                 
@@ -1130,7 +1258,7 @@ Output as a JSON object with these EXACT keys:
                                     <div className="col-span-8 flex flex-col gap-4 min-h-0">
                                         
                                         {/* Platform Cards Row */}
-                                        <div className="grid grid-cols-3 gap-4 h-auto shrink-0">
+                                        <div className="grid grid-cols-3 gap-3 h-auto shrink-0">
                                             {reg.platformStats.filter(p => p.mncs > 0 || p.spend > 0).map(p => (
                                                 <div key={p.name} className="bg-white border-2 border-slate-50 rounded-[1.5rem] p-3 shadow-lg flex flex-col relative overflow-hidden group">
                                                     
@@ -1152,34 +1280,41 @@ Output as a JSON object with these EXACT keys:
                                                     </div>
                                                     
                                                     {/* Trendline */}
-                                                    <div className="w-full h-8 mb-2 opacity-50 group-hover:opacity-100 transition-opacity">
-                                                        <MiniTrend data={p.trend.map(t => t.mncs)} height={32} color="#818cf8" />
+                                                    <div className="w-full h-6 mb-1.5 opacity-50 group-hover:opacity-100 transition-opacity">
+                                                        <MiniTrend data={p.trend.map(t => t.mncs)} height={24} color="#818cf8" />
                                                     </div>
                                                     
                                                     {/* Spend */}
-                                                    <div className="mb-1.5 bg-slate-50 px-2 py-1.5 rounded-xl border border-slate-100 flex flex-col justify-center">
+                                                    <div className="mb-1 bg-slate-50 px-1.5 py-1 rounded-xl border border-slate-100 flex flex-col justify-center">
                                                         <div className="flex justify-between items-start mb-0.5">
-                                                            <p className="text-[9px] text-slate-400 font-bold uppercase tracking-wider mt-0.5">Spend</p>
+                                                            <p className="text-[8px] text-slate-400 font-bold uppercase tracking-wider mt-0.5">Spend</p>
                                                             {renderPlatformPct(p.shifts?.mom?.spend, 'spend', p.spend)}
                                                         </div>
-                                                        <p className="text-lg font-black text-slate-900">{fmtCompactCurr(p.spend)}</p>
+                                                        <p className="text-[14px] font-black text-slate-900">{fmtCompactCurr(p.spend)}</p>
                                                     </div>
                                                     
-                                                    {/* LTV & CPA Row */}
-                                                    <div className="grid grid-cols-2 gap-1.5 mt-auto">
-                                                        <div className="bg-slate-50 px-2 py-1.5 rounded-xl border border-slate-100 flex flex-col justify-center">
+                                                    {/* LTV, CPA, CM Row */}
+                                                    <div className="grid grid-cols-3 gap-1 mt-auto">
+                                                        <div className="bg-slate-50 px-1 py-1 rounded-xl border border-slate-100 flex flex-col justify-center overflow-hidden">
                                                             <div className="flex justify-between items-start mb-0.5">
-                                                                <p className="text-[9px] text-slate-400 font-bold uppercase tracking-wider mt-0.5">LTV</p>
+                                                                <p className="text-[7px] text-slate-400 font-bold uppercase tracking-wider mt-0.5">LTV</p>
                                                                 {renderPlatformPct(p.shifts?.mom?.ltv, 'ltv', p.ltv)}
                                                             </div>
-                                                            <p className="text-sm font-black text-slate-900">£{p.ltv.toFixed(2)}</p>
+                                                            <p className="text-[10px] font-black text-slate-900 truncate">£{p.ltv.toFixed(2)}</p>
                                                         </div>
-                                                        <div className="bg-slate-50 px-2 py-1.5 rounded-xl border border-slate-100 flex flex-col justify-center">
+                                                        <div className="bg-slate-50 px-1 py-1 rounded-xl border border-slate-100 flex flex-col justify-center overflow-hidden">
                                                             <div className="flex justify-between items-start mb-0.5">
-                                                                <p className="text-[9px] text-slate-400 font-bold uppercase tracking-wider mt-0.5">CPA</p>
+                                                                <p className="text-[7px] text-slate-400 font-bold uppercase tracking-wider mt-0.5">CPA</p>
                                                                 {renderPlatformPct(p.shifts?.mom?.cpa, 'cpa', p.cpa)}
                                                             </div>
-                                                            <p className="text-sm font-black text-slate-900">£{p.cpa.toFixed(0)}</p>
+                                                            <p className="text-[10px] font-black text-slate-900 truncate">£{p.cpa.toFixed(2)}</p>
+                                                        </div>
+                                                        <div className="bg-slate-50 px-1 py-1 rounded-xl border border-slate-100 flex flex-col justify-center overflow-hidden">
+                                                            <div className="flex justify-between items-start mb-0.5">
+                                                                <p className="text-[7px] text-slate-400 font-bold uppercase tracking-wider mt-0.5">CM</p>
+                                                                {renderPlatformPct(p.shifts?.mom?.cm, 'cm', p.cm)}
+                                                            </div>
+                                                            <p className="text-[10px] font-black text-slate-900 truncate">{fmtCompactCurr(p.cm)}</p>
                                                         </div>
                                                     </div>
 
@@ -1199,7 +1334,7 @@ Output as a JSON object with these EXACT keys:
                                             </h4>
                                             <textarea 
                                                 className="bg-transparent text-slate-700 w-full h-full resize-none outline-none font-medium text-[14px] leading-relaxed placeholder:text-slate-400" 
-                                                placeholder="Enter plans for next month..."
+                                                placeholder="Plans for next month..."
                                                 value={narratives[reg.name + '_plan'] || ""}
                                                 onChange={e => setNarratives({...narratives, [reg.name + '_plan']: e.target.value})}
                                             />
@@ -1247,9 +1382,9 @@ Output as a JSON object with these EXACT keys:
                                     </div>
                                     <h2 className="text-[2.5rem] font-black text-wise-forest tracking-tighter mb-8">Team Updates</h2>
                                     <textarea 
-                                        className="w-full flex-1 resize-none outline-none text-slate-600 text-lg leading-[1.8] text-left font-medium placeholder:text-slate-300"
+                                        className="w-full flex-1 resize-none outline-none text-slate-600 text-lg leading-[1.8] text-center font-medium placeholder:text-slate-300"
                                         placeholder="Enter team updates..."
-                                        value={narratives['team_updates'] !== undefined ? narratives['team_updates'] : "• Cristina has joined in the London Office as a Paid Display Manager!\n\n• Li is off for a well-deserved Sabbatical."}
+                                        value={narratives['team_updates'] !== undefined ? narratives['team_updates'] : "Cristina has joined in the London Office as a Paid Display Manager!\n\nLi is off for a well-deserved Sabbatical."}
                                         onChange={e => setNarratives({...narratives, 'team_updates': e.target.value})}
                                     />
                                 </div>
@@ -1261,9 +1396,9 @@ Output as a JSON object with these EXACT keys:
                                     </div>
                                     <h2 className="text-[2.5rem] font-black text-wise-forest tracking-tighter mb-8">Upcoming Plans</h2>
                                     <textarea 
-                                        className="w-full flex-1 resize-none outline-none text-slate-600 text-lg leading-[1.8] text-left font-medium placeholder:text-slate-300"
+                                        className="w-full flex-1 resize-none outline-none text-slate-600 text-lg leading-[1.8] text-center font-medium placeholder:text-slate-300"
                                         placeholder="Enter upcoming plans..."
-                                        value={narratives['upcoming_plans'] !== undefined ? narratives['upcoming_plans'] : "• Android Test on Moloco.\n\n• Launch of Amazon DSP activity.\n\n• Visa World Cup Campaign."}
+                                        value={narratives['upcoming_plans'] !== undefined ? narratives['upcoming_plans'] : "Android Test on Moloco.\n\nLaunch of Amazon DSP activity.\n\nVisa World Cup Campaign."}
                                         onChange={e => setNarratives({...narratives, 'upcoming_plans': e.target.value})}
                                     />
                                 </div>
@@ -1271,11 +1406,13 @@ Output as a JSON object with these EXACT keys:
                         </div>
 
                         {/* Analysis End Slide */}
-                        <div className="slide-container bg-wise-forest overflow-hidden relative">
-                            <div className="relative z-10 w-full h-full flex flex-col justify-start">
-                                <h1 className="text-wise-fast font-black uppercase tracking-tighter" style={{ fontSize: '8.5rem', lineHeight: '0.9' }}>
-                                    THANK<br/>YOU
-                                </h1>
+                        <div className="slide-container bg-wise-forest overflow-hidden relative last-slide">
+                            <div className="relative z-10 w-full h-full flex flex-col justify-center items-center text-center py-8">
+                                <h1 className="text-wise-fast font-black uppercase tracking-tighter opacity-100" style={{ fontSize: '8rem', lineHeight: '0.9' }}>MAHALO</h1>
+                                <h1 className="text-wise-fast font-black uppercase tracking-tighter opacity-[0.85]" style={{ fontSize: '8rem', lineHeight: '0.9' }}>THANKS</h1>
+                                <h1 className="text-wise-fast font-black uppercase tracking-tighter opacity-70" style={{ fontSize: '8rem', lineHeight: '0.9' }}>GRAZIE</h1>
+                                <h1 className="text-wise-fast font-black uppercase tracking-tighter opacity-50" style={{ fontSize: '8rem', lineHeight: '0.9' }}>OBRIGADO</h1>
+                                <h1 className="text-wise-fast font-black uppercase tracking-tighter opacity-[0.35]" style={{ fontSize: '8rem', lineHeight: '0.9' }}>BEDANKT</h1>
                             </div>
                         </div>
                     </div>
