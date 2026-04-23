@@ -395,7 +395,7 @@
                         };
                     });
 
-                    // --- TABLE GROUPING LOGIC (Using NoAvow data so it stays hidden) ---
+                    // --- TABLE GROUPING LOGIC ---
                     const breakDownRecords = curMatchNoAvow;
                     let dimKey = isGlobal ? 'region' : 'country';
                     if (!isGlobal && breakDownRecords.every(d => !d.country || d.country === regionName)) {
@@ -458,14 +458,63 @@
                 if (!apiKey || !reportData) return;
                 setIsSyncing(true);
                 try {
-                    const regContext = reportData.regions.map(r => `${r.name} Perf: ${narratives[r.name+'_perf']||''} | ${r.name} Plan: ${narratives[r.name+'_plan']||''}`).join('\n');
-                    const prompt = `As a marketing analyst, summarize these regional updates for ${selectedMonth} into a global view.\n\nInput Regional Data:\n${regContext}\n\nOutput a JSON object with four keys:\n1. "GLOBAL_perf": Keep this exact prefix: "In ${getMoName(selectedMonth)}, we drove ${reportData.global.stats.mncs.toLocaleString()} MNCs (${reportData.global.shifts.mom.mncs > 0 ? '+' : ''}${(reportData.global.shifts.mom.mncs * 100).toFixed(1)}% MoM) with a total spend of ${fmtCompactCurr(reportData.global.stats.spend)} (${reportData.global.shifts.mom.spend > 0 ? '+' : ''}${(reportData.global.shifts.mom.spend * 100).toFixed(1)}% MoM). This resulted in a payback of ${reportData.global.stats.payback.toFixed(1)}m (${reportData.global.shifts.mom.payback > 0 ? '+' : ''}${(reportData.global.shifts.mom.payback * 100).toFixed(1)}% MoM)." followed by a double newline, then write a short, high-level summary of the most important performance drivers across all regions (do NOT list every region individually).\n2. "GLOBAL_plan": A bulleted list summarizing the most important, high-priority upcoming plans globally based on the regional plans.\n3. "GAC_perf": A short summary focusing specifically on Google App Campaigns (GAC) global performance based on the regional notes.\n4. "GAC_plan": A bulleted list of upcoming plans specifically related to Google App Campaigns.\n5. "MOLOCO_perf": A short summary focusing specifically on Moloco global performance based on the regional notes.\n6. "MOLOCO_plan": A bulleted list of upcoming plans specifically related to Moloco.\n7. "TTD_perf": A short summary focusing specifically on The Trade Desk (TTD) global performance based on the regional notes.\n8. "TTD_plan": A bulleted list of upcoming plans specifically related to The Trade Desk.`;
+                    const regContext = reportData.regions.map(r => {
+                        return `${r.name} Performance Details: ${narratives[r.name+'_perf'] || 'N/A'}\n${r.name} Upcoming Plans: ${narratives[r.name+'_plan'] || 'N/A'}`;
+                    }).join('\n\n---\n\n');
+
+                    const systemPrompt = "You are a professional senior marketing analyst at Wise. You are summarizing paid display performance across multiple regions for the monthly reporting cycle.";
+
+                    const prompt = `Based on the following regional overviews for ${getMoName(selectedMonth)}, generate a global summary.
+
+Input Data (Regional Summaries & Plans):
+${regContext}
+
+Instructions:
+1. Provide a global summary for Global Paid Display (GLOBAL_perf) and the three main platforms: Google AC (GAC_perf), Moloco (MOLOCO_perf), and The Trade Desk (TTD_perf).
+2. For "GLOBAL_perf", start with this EXACT sentence structure: "In ${getMoName(selectedMonth)}, we drove ${reportData.global.stats.mncs.toLocaleString()} MNCs (${reportData.global.shifts.mom.mncs > 0 ? '+' : ''}${(reportData.global.shifts.mom.mncs * 100).toFixed(1)}% MoM) with a total spend of ${fmtCompactCurr(reportData.global.stats.spend)} (${reportData.global.shifts.mom.spend > 0 ? '+' : ''}${(reportData.global.shifts.mom.spend * 100).toFixed(1)}% MoM). This resulted in a payback of ${reportData.global.stats.payback.toFixed(1)}m (${reportData.global.shifts.mom.payback > 0 ? '+' : ''}${(reportData.global.shifts.mom.payback * 100).toFixed(1)}% MoM)." 
+   - Then append 2-3 sentences summarizing the biggest global trends (e.g., specific market wins, creative performance, or tech shifts) derived from regional input.
+3. For "GLOBAL_plan", provide a summarized bulleted list of the top 3-5 highest-priority upcoming initiatives globally.
+4. For platform performance (GAC_perf, MOLOCO_perf, TTD_perf), summarize their specific performance story and payback status based on regional details.
+5. For platform plans (GAC_plan, MOLOCO_plan, TTD_plan), provide 2-3 key upcoming initiatives specific to that channel.
+
+Output as a JSON object with these EXACT keys:
+{
+  "GLOBAL_perf": "text string",
+  "GLOBAL_plan": "bulleted string starting with •",
+  "GAC_perf": "text string",
+  "GAC_plan": "bulleted string starting with •",
+  "MOLOCO_perf": "text string",
+  "MOLOCO_plan": "bulleted string starting with •",
+  "TTD_perf": "text string",
+  "TTD_plan": "bulleted string starting with •"
+}`;
                     
-                    const res = await fetch("https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-09-2025:generateContent?key=" + apiKey, { method: 'POST', body: JSON.stringify({ contents: [{ parts: [{ text: prompt }] }] }) });
+                    const res = await fetch("https://api.openai.com/v1/chat/completions", { 
+                        method: 'POST', 
+                        headers: {
+                            'Content-Type': 'application/json',
+                            'Authorization': `Bearer ${apiKey}`
+                        },
+                        body: JSON.stringify({ 
+                            model: "gpt-4o",
+                            messages: [
+                                { role: "system", content: systemPrompt },
+                                { role: "user", content: prompt }
+                            ],
+                            response_format: { type: "json_object" }
+                        }) 
+                    });
+
+                    if (!res.ok) throw new Error("API call failed");
+
                     const json = await res.json();
-                    const aiResult = JSON.parse((json.candidates?.[0]?.content?.parts?.[0]?.text || "{}").replace(/```json|```/g, ''));
+                    const aiResult = JSON.parse(json.choices[0].message.content);
                     setNarratives(prev => ({...prev, ...aiResult}));
-                } catch (e) { console.error(e); } finally { setIsSyncing(false); }
+                } catch (e) { 
+                    console.error(e); 
+                } finally { 
+                    setIsSyncing(false); 
+                }
             };
 
             if (!rawData.length) {
@@ -513,7 +562,7 @@
                             <select value={selectedMonth} onChange={e => setSelectedMonth(e.target.value)} className="bg-white/10 border border-white/20 text-white font-bold text-xs px-6 py-3 rounded-2xl outline-none">
                                 {[...new Set(rawData.map(d => d.date))].sort().reverse().map(d => <option key={d} value={d} className="text-black">{d}</option>)}
                             </select>
-                            <input type="password" placeholder="Gemini Key" value={apiKey} onChange={e => setApiKey(e.target.value)} className="bg-white/10 border border-white/20 text-white text-xs px-6 py-3 rounded-2xl outline-none w-32 focus:w-64 transition-all" />
+                            <input type="password" placeholder="OpenAI Key" value={apiKey} onChange={e => setApiKey(e.target.value)} className="bg-white/10 border border-white/20 text-white text-xs px-6 py-3 rounded-2xl outline-none w-32 focus:w-64 transition-all" />
                             <button onClick={runAISync} disabled={isSyncing} className="bg-indigo-600 text-white px-8 py-3 rounded-2xl font-black text-xs uppercase hover:bg-indigo-500 flex items-center gap-3 shadow-lg active:scale-95 transition-transform">
                                 {isSyncing ? <Icons.Loader size={16} /> : <Icons.Zap size={16} />} Sync
                             </button>
@@ -631,7 +680,7 @@
                                                             {reportData.global.platformStats.map((p, i) => (
                                                                 <td key={i} className="py-2 px-2 text-right">
                                                                     <div className="flex flex-col items-end gap-0.5">
-                                                                        <span className="font-black text-slate-900 text-[14px]">{p.payback.toFixed(1) + 'm'}</span>
+                                                                        <span className="font-black text-slate-900 text-[14px]">{p.payback.toFixed(1)}m</span>
                                                                         {renderTablePct(p.shifts?.mom?.payback, 'payback', p.payback)}
                                                                     </div>
                                                                 </td>
