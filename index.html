@@ -3,412 +3,317 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Marketing Performance Intelligence</title>
+    <title>Marketing Performance Slideshow</title>
     <!-- Standalone Dependencies -->
     <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
     <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
     <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
     <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        wise: {
+                            forest: '#163300',
+                            fast: '#9FE870'
+                        }
+                    }
+                }
+            }
+        }
+    </script>
     <style>
-        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;700;900&display=swap');
-        body { font-family: 'Inter', sans-serif; -webkit-print-color-adjust: exact; }
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;900&display=swap');
         
-        /* Advanced Print Layout & Grouping - Based on 114.pdf logic */
-        @media print {
-            @page { margin: 10mm; }
-            .no-print { display: none !important; }
-            body { background: white !important; padding: 0 !important; margin: 0 !important; }
-            .max-w-5xl { max-width: 100% !important; padding: 0 !important; width: 100% !important; margin: 0 !important; }
-            
-            /* Tightened layout for the first page */
-            .region-section {
-                page-break-before: always !important;
-                break-before: page !important;
-                padding-top: 10px !important; 
-            }
-            .region-section:first-of-type { 
-                page-break-before: avoid !important; 
-                break-before: avoid !important; 
-                padding-top: 0 !important; 
-            }
-            
-            /* Pattern: Chart Page -> Table/Narrative Page */
-            .chart-page-block {
-                page-break-after: always !important;
-                break-after: page !important;
-                margin-bottom: 0 !important;
-            }
-            
-            .table-narrative-block {
-                page-break-after: always !important;
-                break-after: page !important;
-                margin-top: 0 !important;
-            }
-
-            .narrative-block { page-break-inside: avoid !important; break-inside: avoid !important; display: block !important; }
-            tr { page-break-inside: avoid !important; break-inside: avoid !important; }
-            thead { display: table-header-group !important; }
-            
-            /* Visual Flattening */
-            .shadow-2xl, .shadow-xl, .shadow-sm { box-shadow: none !important; border: 1px solid #f1f5f9 !important; }
-            .ring-4 { ring: 0 !important; border: 1px solid #e2e8f0 !important; }
+        :root {
+            --wise-forest: #163300;
+            --wise-fast: #9FE870;
+            --brand-indigo: #4338ca;
         }
 
-        .animate-in { animation: fadeIn 0.8s ease-out; }
-        @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
-        textarea::-webkit-scrollbar { width: 0px; background: transparent; }
-        .loading-shimmer { background: linear-gradient(90deg, #f1f5f9 25%, #e2e8f0 50%, #f1f5f9 75%); background-size: 200% 100%; animation: shimmer 1.5s infinite; }
-        @keyframes shimmer { 0% { background-position: 200% 0; } 100% { background-position: -200% 0; } }
+        body { 
+            font-family: 'Inter', sans-serif; 
+            background-color: #f1f5f9;
+            -webkit-print-color-adjust: exact; 
+        }
+
+        .slide-container {
+            width: 100%;
+            max-width: 1400px;
+            margin: 3rem auto;
+            background: white;
+            aspect-ratio: 16 / 9;
+            box-shadow: 0 40px 80px -15px rgba(0, 0, 0, 0.15);
+            display: flex;
+            flex-direction: column;
+            border-radius: 2rem;
+            position: relative;
+            padding: 0.5cm; /* Exactly 0.5cm outer padding */
+            overflow: hidden; 
+        }
+
+        @media print {
+            @page { size: landscape; margin: 0; }
+            body { background: white !important; padding: 0 !important; margin: 0 !important; }
+            .no-print { display: none !important; }
+            .slide-container {
+                margin: 0 !important;
+                width: 100vw !important;
+                height: 100vh !important;
+                max-width: none !important;
+                page-break-after: always !important;
+                break-after: page !important;
+                box-shadow: none !important;
+                border: none !important;
+                border-radius: 0 !important;
+                padding: 0.5cm !important; /* Exactly 0.5cm margin for PDF export */
+            }
+        }
+
+        .animate-grow { animation: grow 1.2s cubic-bezier(0.4, 0, 0.2, 1) forwards; transform-origin: left; scale: 0 1; }
+        @keyframes grow { to { scale: 1 1; } }
+
+        textarea::-webkit-scrollbar { width: 5px; }
+        textarea::-webkit-scrollbar-thumb { background: rgba(0,0,0,0.1); border-radius: 10px; }
     </style>
 </head>
-<body class="bg-[#f8fafc]">
+<body>
     <div id="root"></div>
 
     <script type="text/babel">
         const { useState, useMemo, useEffect, useRef } = React;
 
-        // --- GLOBAL CONSTANTS & UTILS ---
-        const REGIONS = ['NORTHAM', 'LATAM', 'ASIA', 'PACIFIC', 'GBR', 'EUROPE', 'MEA'];
-        const PLATFORMS_LIST = ['Overall', 'Google AC', 'TTD', 'Moloco'];
-        const MONTH_NAMES = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
+        // --- CONFIG & UTILS ---
+        const REGIONS = ['LATAM', 'NORTHAM', 'EUROPE', 'ASIA', 'PACIFIC', 'GBR', 'MEA'];
+        const PLATFORMS_UI = ['Google AC', 'Moloco', 'TTD']; 
+        const MONTHS = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
 
-        const safeParseNum = (val) => {
-            if (typeof val === 'number') return val;
-            if (val === undefined || val === null || val === "") return 0;
-            const cleaned = String(val).replace(/[^\d.-]/g, '');
-            const num = parseFloat(cleaned);
-            return isNaN(num) ? 0 : num;
+        const safeNum = (v) => {
+            if (typeof v === 'number') return v;
+            if (!v) return 0;
+            const n = parseFloat(String(v).replace(/[^\d.-]/g, ''));
+            return isNaN(n) ? 0 : n;
         };
 
-        const getMonthName = (dateStr) => {
-            if (!dateStr) return "";
-            const parts = dateStr.split('-');
-            if (parts.length < 2) return "";
-            const m = parseInt(parts[1]);
-            return MONTH_NAMES[m-1] || "";
+        const fmtCurr = (v) => new Intl.NumberFormat('en-GB', { style: 'currency', currency: 'GBP', minimumFractionDigits: 0 }).format(v);
+        const fmtCompactNum = (v) => Intl.NumberFormat('en-GB', { notation: "compact", maximumFractionDigits: 1 }).format(v).toLowerCase();
+        const fmtCompactCurr = (v) => "£" + Intl.NumberFormat('en-GB', { notation: "compact", maximumFractionDigits: 1 }).format(v).toLowerCase();
+        
+        const getMoName = (d) => {
+            if (!d || d === "No Date") return "Performance Cycle";
+            const parts = d.split('-');
+            return parts.length > 1 ? MONTHS[parseInt(parts[1]) - 1] : d;
         };
 
-        const formatAccurateCurrency = (v) => {
-            return new Intl.NumberFormat('en-GB', { style: 'currency', currency: 'GBP', minimumFractionDigits: 0 }).format(v);
+        const formatCoverDate = (d) => {
+            if (!d || d === "No Date") return "Performance Cycle";
+            const parts = d.split('-');
+            if (parts.length >= 2) {
+                let yr = parts[0].length === 4 ? parts[0] : (parts[1].length === 4 ? parts[1] : '2026');
+                let moIdx = parts[0].length === 4 ? parseInt(parts[1]) - 1 : parseInt(parts[0]) - 1;
+                if (!isNaN(moIdx) && moIdx >= 0 && moIdx < 12) {
+                    return `${MONTHS[moIdx].substring(0, 3)} ${yr}`;
+                }
+            }
+            return d.length > 3 ? d.substring(0, 3) + " 2026" : d;
         };
 
-        // --- OPENAI API INTEGRATION ---
-        const callAI = async (prompt, systemInstruction, providedKey) => {
-            if (!providedKey) throw new Error("OpenAI API Key Missing. Click the Key icon in the nav bar.");
-            const url = "https://api.openai.com/v1/chat/completions";
-            const payload = {
-                model: "gpt-4o-mini",
-                messages: [
-                    { role: "system", content: systemInstruction },
-                    { role: "user", content: prompt }
-                ],
-                temperature: 0.7
-            };
-            const response = await fetch(url, {
-                method: 'POST',
-                headers: { 
-                    'Content-Type': 'application/json',
-                    'Authorization': `Bearer ${providedKey.trim()}`
-                },
-                body: JSON.stringify(payload)
-            });
-            const result = await response.json();
-            if (!response.ok) throw new Error(result.error?.message || "OpenAI API Error");
-            return result.choices[0].message.content || "Synthesis failed.";
+        const parseCSVRows = (text, delimiter) => {
+            const rows = [];
+            let row = [];
+            let field = '';
+            let inQuotes = false;
+            for (let i = 0; i < text.length; i++) {
+                const char = text[i];
+                const nextChar = text[i + 1];
+                if (inQuotes) {
+                    if (char === '"' && nextChar === '"') { field += '"'; i++; }
+                    else if (char === '"') inQuotes = false;
+                    else field += char;
+                } else {
+                    if (char === '"') inQuotes = true;
+                    else if (char === delimiter) { row.push(field); field = ''; }
+                    else if (char === '\n' || char === '\r') {
+                        row.push(field);
+                        if (row.some(c => c.trim() !== '')) rows.push(row);
+                        row = []; field = '';
+                        if (char === '\r' && nextChar === '\n') i++;
+                    } else field += char;
+                }
+            }
+            if (field || row.length > 0) { row.push(field); rows.push(row); }
+            return rows;
         };
-
-        function parseCSV(text) {
-            text = text.replace(/^\uFEFF/, '');
-            const lines = text.split(/\r?\n/).filter(l => l.trim());
-            if (lines.length < 2) return [];
-            const delimiter = lines[0].includes(';') ? ';' : ',';
-            const headers = lines[0].split(delimiter).map(h => {
-                const raw = h.trim().replace(/^"|"$/g, '').toLowerCase().replace(/[^a-z0-9]/g, '');
-                if (raw.includes('month') || raw.includes('date')) return 'date';
-                if (raw.includes('country')) return 'country';
-                if (raw.includes('marketingregion')) return 'region';
-                if (raw.includes('region') && !raw.includes('country')) return 'region';
-                if (raw.includes('platform') || raw.includes('source') || raw.includes('vendor')) return 'platform';
-                if (raw.includes('mncs') || raw.includes('deposits') || raw.includes('conv')) return 'mncs';
-                if (raw.includes('regs') || raw.includes('registrations')) return 'regs';
-                if (raw.includes('ltv')) return 'ltv';
-                if (raw.includes('payback')) return 'payback';
-                if (raw.includes('spend') || raw.includes('cost')) return 'spend';
-                return raw;
-            });
-            return lines.slice(1).map(line => {
-                const values = line.split(delimiter).map(v => v.trim().replace(/^"|"$/g, ''));
-                const obj = {};
-                headers.forEach((h, i) => {
-                    let val = values[i];
-                    if (h === 'platform' && val) {
-                        const p = val.toLowerCase();
-                        if (p.includes('google')) val = 'Google AC';
-                        else if (p.includes('trade')) val = 'TTD';
-                        else if (p.includes('moloco')) val = 'Moloco';
-                    }
-                    if (h === 'date' && val) {
-                        const m = val.match(/^(\d{4})[-/](\d{2})/);
-                        if (m) val = `${m[1]}-${m[2]}`;
-                    }
-                    obj[h] = val;
-                });
-                return obj;
-            });
-        }
 
         const Icons = {
-            Upload: (p) => <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" {...p}><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M17 8l-5-5-5 5M12 3v12"/></svg>,
-            Chart: (p) => <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" {...p}><path d="M12 20V10M18 20V4M6 20v-4"/></svg>,
-            X: (p) => <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" {...p}><path d="M18 6 6 18M6 6l12 12"/></svg>,
-            Message: (p) => <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" {...p}><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>,
-            Zap: (p) => <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" {...p}><path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"/></svg>,
-            Key: (p) => <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" {...p}><path d="M21 2l-2 2m-7.61 7.61a5.5 5.5 0 1 1-7.778 7.778 5.5 5.5 0 0 1 7.777-7.777zm0 0L15.5 7.5m0 0l3 3m-3-3l2.5-2.5"/></svg>,
-            Loader: (p) => <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="animate-spin" {...p}><path d="M12 2v4m0 12v4M4.93 4.93l2.83 2.83m8.48 8.48l2.83 2.83M2 12h4m12 0h4M4.93 19.07l2.83-2.83m8.48-8.48l2.83-2.83"/></svg>,
-            Map: (p) => <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" {...p}><path d="M3 6l6-3 6 3 6-3v15l-6 3-6-3-6 3V6zm6-3v15m6-15v15"/></svg>,
-            Brain: (p) => <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" {...p}><path d="M9.5 2A5 5 0 0 1 12 4a5 5 0 0 1 2.5-2 4.5 4.5 0 1 1 0 9 5 5 0 0 1-5 0 4.5 4.5 0 1 1 0-9z"/><path d="M12 11v11"/><path d="M8 15v4"/><path d="M16 15v4"/></svg>
+            Chart: (p) => <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" {...p}><path d="M12 20V10M18 20V4M6 20v-4"/></svg>,
+            Upload: (p) => <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" {...p}><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M17 8l-5-5-5 5M12 3v12"/></svg>,
+            Zap: (p) => <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" {...p}><path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"/></svg>,
+            X: (p) => <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" {...p}><path d="M18 6 6 18M6 6l12 12"/></svg>,
+            Loader: (p) => <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="animate-spin" {...p}><path d="M12 2v4m0 12v4M4.93 4.93l2.83 2.83m8.48 8.48l2.83 2.83M2 12h4m12 0h4"/></svg>,
+            Info: (p) => <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" {...p}><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg>,
+            Globe: (p) => <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" {...p}><circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg>,
+            Calendar: (p) => <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" {...p}><rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect><line x1="16" y1="2" x2="16" y2="6"></line><line x1="8" y1="2" x2="8" y2="6"></line><line x1="3" y1="10" x2="21" y2="10"></line></svg>,
+            WiseLogo: (p) => <svg width="100%" height="100%" viewBox="0 0 32 24" fill="currentColor" {...p}><path d="M12.98 0L20.89 0L14.7 7.74H20.73L5.47 24L10.37 13.9H5.16L12.98 0Z"/></svg>
         };
 
-        const AutoExpandingTextarea = ({ value, onChange, placeholder, className, isLoading }) => {
-            const textareaRef = useRef(null);
-            useEffect(() => {
-                if (textareaRef.current) {
-                    textareaRef.current.style.height = 'auto';
-                    textareaRef.current.style.height = textareaRef.current.scrollHeight + 'px';
-                }
-            }, [value]);
+        const Badge = ({ val, label, inverse = false, metricType, rawVal }) => {
+            if (val === undefined || val === null || val === 0 || !isFinite(val)) return null;
+            const isPos = val > 0;
+            let good = inverse ? !isPos : isPos;
+            
+            if (metricType === 'payback' && rawVal !== undefined) {
+                const prev = rawVal / (1 + val);
+                good = Math.abs(rawVal - 15) < Math.abs(prev - 15);
+            }
+            if (metricType === 'spend') good = isPos;
+
             return (
-                <div className="relative w-full">
-                    {isLoading && <div className="absolute inset-0 z-10 opacity-40 loading-shimmer rounded-[2rem] no-print" />}
-                    <textarea
-                        ref={textareaRef}
-                        value={value}
-                        onChange={onChange}
-                        placeholder={placeholder}
-                        className={`w-full overflow-hidden resize-none transition-all duration-200 focus:ring-0 focus:outline-none ${className} ${isLoading ? 'opacity-30' : ''}`}
-                    />
+                <div className="flex flex-col items-center">
+                    <span className={`px-1.5 py-0.5 rounded text-[9px] font-bold uppercase tracking-wider ${good ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}`}>
+                        {isPos ? '↑' : '↓'} {Math.abs(val * 100).toFixed(0)}%
+                    </span>
+                    <span className="text-[7px] text-slate-400 font-black mt-0.5 uppercase tracking-tighter">{label}</span>
                 </div>
             );
         };
 
-        const ChangeBadge = ({ val, inverse = false }) => {
-            if (val === null || val === undefined || !isFinite(val) || val === 0) return <span className="text-slate-300 text-[10px] font-black uppercase tracking-widest">-</span>;
-            const isPos = val >= 0;
-            const good = inverse ? !isPos : isPos;
-            return (
-                <span className={`inline-flex items-center px-3 py-1 rounded-full text-[10px] font-black leading-none whitespace-nowrap ${good ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}`}>
-                    {isPos ? '+' : ''}{(val * 100).toFixed(0)}%
-                </span>
-            );
-        };
-
-        const PlatformDashboard = ({ region, month, title, dashboard, isGlobal, isOverall, onNarrativeChange, onRoadmapSync, onSyncFromRegions, commentary, roadmap, isSyncing }) => {
-            if (!dashboard || !dashboard.trend || dashboard.trend.length === 0) return null;
-            const { trend, contributionList, summaryTotals } = dashboard;
-            
-            const svgWidth = 1000, svgHeight = 500; 
-            const pL = 80, pR = 80, pY = 60, cW = svgWidth - pL - pR, cH = svgHeight - pY * 2;
-
-            const getRange = (key) => {
-                const vals = trend.map(d => d[key]);
-                const min = Math.min(...vals);
-                const max = Math.max(...vals);
-                return { min, max, diff: (max - min) || 1 };
+        const MetricCard = ({ title, val, mom, yoy, inverse = false, rawVal }) => {
+            const formatPct = (v) => (Math.abs(v) * 100).toFixed(1) + '%';
+            const getColor = (v) => {
+                if (v === undefined || v === null || v === 0 || !isFinite(v)) return 'text-slate-400';
+                let good = inverse ? v < 0 : v > 0;
+                
+                if (title === 'Payback' && rawVal !== undefined) {
+                    const prev = rawVal / (1 + v);
+                    good = Math.abs(rawVal - 15) < Math.abs(prev - 15);
+                }
+                if (title === 'Spend') good = v > 0; 
+                
+                return good ? 'text-green-600' : 'text-[#d32f2f]'; 
             };
-
-            const sRange = getRange('spend');
-            const pbRange = getRange('payback');
-            const ltvRange = getRange('ltv');
-            const maxMnc = Math.max(...trend.map(d => d.mncs), 1);
-
-            const getLaneY = (val, rangeObj, bP, tP) => {
-                const totalPct = (bP / 100) + (((val - rangeObj.min) / rangeObj.diff) * ((tP - bP) / 100));
-                return pY + cH - (totalPct * cH);
-            };
-
-            const getX = (i) => pL + i * (trend.length > 1 ? cW / (trend.length - 1) : 0);
-
-            const performanceBaseline = useMemo(() => {
-                const cur = trend.find(t => t.month === month);
-                if (!cur) return "";
-                const header = `${getMonthName(month)} concluded with ${cur.mncs.toLocaleString()} MNCs at a ${cur.payback.toFixed(1)}-month payback. `;
-                const details = contributionList.slice(0, 5).map(item => {
-                    const labelStr = isOverall ? item.label : `${title} in ${item.label}`;
-                    return `${labelStr} drove ${item.mncs.toLocaleString()} MNCs at a ${item.payback.toFixed(1)}-month payback with a LTV of £${item.ltv.toFixed(2)}.`;
-                }).join(' ');
-                return `${header}${details}`;
-            }, [trend, month, contributionList, isOverall, title]);
+            const getSign = (v) => (v > 0 ? '+' : v < 0 ? '-' : '');
 
             return (
-                <div className="platform-unit mb-12 space-y-0">
-                    {/* CHART BLOCK - Page 1 of Platform */}
-                    <div className="bg-white rounded-[2.5rem] shadow-2xl border border-slate-100 flex flex-col overflow-visible chart-page-block mb-12">
-                        <div className={`${isOverall ? 'bg-indigo-900' : 'bg-[#1a3812]'} px-10 py-6 border-b border-slate-200 flex justify-between items-center rounded-t-[2.5rem]`}>
-                            <h3 className="text-2xl font-black text-white uppercase tracking-tighter">{title}</h3>
-                            <span className="text-[10px] text-white/40 font-black uppercase tracking-[0.4em]">{isGlobal ? 'Regional Synthesis' : 'Market Analysis'}</span>
-                        </div>
-                        <div className="p-10">
-                            <div className="w-full bg-white overflow-visible pb-4 border-b border-slate-50">
-                                <svg viewBox={`0 0 ${svgWidth} ${svgHeight}`} className="w-full h-auto overflow-visible block">
-                                    <defs>
-                                        <filter id="halo" x="-50%" y="-50%" width="200%" height="200%">
-                                            <feFlood floodColor="white" result="bg" /><feMorphology in="SourceAlpha" operator="dilate" radius="1.2" result="dilated" /><feComposite in="bg" in2="dilated" operator="in" result="outline" /><feMerge><feMergeNode in="outline" /><feMergeNode in="SourceGraphic" /></feMerge>
-                                        </filter>
-                                    </defs>
-                                    {[0, 0.25, 0.5, 0.75, 1].map(r => <line key={r} x1={pL} y1={pY + cH * r} x2={svgWidth - pR} y2={pY + cH * r} stroke="#f1f5f9" strokeWidth="1" />)}
-                                    
-                                    <path d={trend.map((d,i)=>`${i===0?'M':'L'} ${getX(i)} ${getLaneY(d.spend, sRange, 60, 82)}`).join(' ')} fill="none" stroke="#ef4444" strokeWidth="3" opacity="0.3" />
-                                    <path d={trend.map((d,i)=>`${i===0?'M':'L'} ${getX(i)} ${getLaneY(d.ltv, ltvRange, 88, 100)}`).join(' ')} fill="none" stroke="#10b981" strokeWidth="2.5" strokeDasharray="6 4" opacity="0.3" />
-                                    <path d={trend.map((d,i)=>`${i===0?'M':'L'} ${getX(i)} ${getLaneY(d.payback, pbRange, 35, 60)}`).join(' ')} fill="none" stroke="#f59e0b" strokeWidth="4" />
-
-                                    {trend.map((d, i) => {
-                                        const x = getX(i);
-                                        const mncH = (d.mncs / maxMnc) * (cH * 0.45); 
-                                        
-                                        // Conditional: Hide Spend/PB labels if investment is 0
-                                        let stack = [
-                                            { id: 'mnc', val: d.mncs.toLocaleString(), y: pY + cH - mncH - 12, color: '#6366f1' },
-                                            d.spend > 0 ? { id: 'spend', val: `£${Math.round(d.spend/1000)}k`, y: getLaneY(d.spend, sRange, 60, 82), color: '#ef4444' } : null,
-                                            d.spend > 0 ? { id: 'pb', val: `${d.payback.toFixed(1)}m`, y: getLaneY(d.payback, pbRange, 35, 60), color: '#f59e0b' } : null,
-                                            { id: 'ltv', val: `£${Math.round(d.ltv)}`, y: getLaneY(d.ltv, ltvRange, 88, 100), color: '#10b981' }
-                                        ].filter(Boolean).sort((a, b) => a.y - b.y);
-                                        
-                                        for (let k = 1; k < stack.length; k++) if (stack[k].y - stack[k-1].y < 46) stack[k].y = stack[k-1].y + 46;
-                                        
-                                        return (
-                                            <g key={i}>
-                                                <rect x={x - 15} y={pY + cH - mncH} width={30} height={mncH} fill="#6366f1" fillOpacity={0.8} rx={4} />
-                                                {stack.map((lbl, idx) => (
-                                                    <g key={idx}>
-                                                        <rect x={x - 34} y={lbl.y - 18} width={68} height={20} rx={10} fill="white" fillOpacity="0.9" stroke={lbl.color} strokeWidth="1" />
-                                                        <text x={x} y={lbl.y - 4} textAnchor="middle" fill={lbl.color} fontSize="10" fontWeight="900" filter="url(#halo)">{lbl.val}</text>
-                                                    </g>
-                                                ))}
-                                                <text x={x} y={pY + cH + 30} textAnchor="middle" fill="#94a3b8" fontSize="10" font-family="Inter" fontWeight="bold" transform={`rotate(-35, ${x}, ${pY + cH + 30})`}>{d.month}</text>
-                                            </g>
-                                        );
-                                    })}
-                                </svg>
-                            </div>
-                            {/* GRAPH LEGEND - Definition labels restored for PDF view */}
-                            <div className="flex flex-wrap items-center justify-center gap-x-8 gap-y-2 px-6 pt-4 border-t border-slate-50">
-                                <div className="flex items-center gap-2"><div className="w-4 h-1 bg-[#ef4444] opacity-40"></div><span className="text-[10px] font-black uppercase text-slate-400 tracking-widest">Investment</span></div>
-                                <div className="flex items-center gap-2"><div className="w-3 h-3 bg-[#6366f1] rounded-sm"></div><span className="text-[10px] font-black uppercase text-slate-400 tracking-widest">MNC Volume</span></div>
-                                <div className="flex items-center gap-2"><div className="w-4 h-1 bg-[#f59e0b]"></div><span className="text-[10px] font-black uppercase text-slate-400 tracking-widest">Payback (m)</span></div>
-                                <div className="flex items-center gap-2"><div className="w-4 h-0.5 border-b border-dashed border-[#10b981]"></div><span className="text-[10px] font-black uppercase text-slate-400 tracking-widest">LTV (£)</span></div>
-                            </div>
-                        </div>
-                    </div>
-
-                    {/* TABLE & NARRATIVE BLOCK - Page 2 of Platform */}
-                    <div className="bg-white rounded-[2.5rem] shadow-2xl border border-slate-100 flex flex-col p-10 space-y-10 table-narrative-block">
-                        <div className="bg-white border border-slate-100 rounded-[2rem] overflow-hidden shadow-sm">
-                            <table className="w-full text-center text-xs border-collapse">
-                                <thead className="bg-[#1a2d1a] border-b text-white font-black uppercase tracking-widest">
-                                    <tr>
-                                        <th className="py-5 px-8 text-left whitespace-nowrap">{isGlobal ? 'Region' : 'Market'}</th>
-                                        <th className="py-5 px-4 text-right">Investment</th>
-                                        <th className="py-5 px-4 text-right">Regs</th>
-                                        <th className="py-5 px-4 text-right">MNCs</th>
-                                        <th className="py-5 px-4 text-center">CVR</th>
-                                        <th className="py-5 px-4 text-[#ef4444]">CPA</th>
-                                        <th className="py-5 px-4 text-[#10b981]">LTV</th>
-                                        <th className="py-5 px-4 text-right pr-10">PB</th>
-                                    </tr>
-                                </thead>
-                                <tbody className="divide-y divide-slate-50 font-bold">
-                                    {contributionList.map((item, i) => (
-                                        <tr key={i} className="hover:bg-slate-50/50 transition-colors">
-                                            <td className="py-4 px-8 text-left uppercase text-slate-900 font-black">{item.label}</td>
-                                            <td className="py-4 px-4 text-right text-slate-500 font-medium">£{item.spend.toLocaleString()}</td>
-                                            <td className="py-4 px-4 text-right text-slate-500">{item.regs.toLocaleString()}</td>
-                                            <td className="py-4 px-4 text-right text-slate-900 font-black">{item.mncs.toLocaleString()}</td>
-                                            <td className="py-4 px-4 text-center text-slate-500">{((item.mncs / (item.regs || 1)) * 100).toFixed(1)}%</td>
-                                            <td className="py-4 px-4 text-[#ef4444] font-black">£{item.cpa.toFixed(2)}</td>
-                                            <td className="py-4 px-4 text-[#10b981]">£{Math.round(item.ltv)}</td>
-                                            <td className="py-4 px-4 text-right pr-10 text-slate-900 font-black">{item.payback.toFixed(1)}m</td>
-                                        </tr>
-                                    ))}
-                                </tbody>
-                                {summaryTotals && (
-                                    <tfoot className="bg-slate-50/80 border-t-2 border-slate-100">
-                                        <tr>
-                                            <td className="py-5 px-8 text-left uppercase text-indigo-900 font-black text-[11px]">Summary MoM%</td>
-                                            <td className="py-5 px-4 text-right"><ChangeBadge val={summaryTotals.mom?.spend} /></td>
-                                            <td className="py-5 px-4 text-right"><ChangeBadge val={summaryTotals.mom?.regs} /></td>
-                                            <td className="py-5 px-4 text-right"><ChangeBadge val={summaryTotals.mom?.mncs} /></td>
-                                            <td className="py-5 px-4 text-center"><ChangeBadge val={summaryTotals.mom?.cvr} /></td>
-                                            <td className="py-5 px-4 text-center"><ChangeBadge val={summaryTotals.mom?.cpa} inverse /></td>
-                                            <td className="py-5 px-4 text-center"><ChangeBadge val={summaryTotals.mom?.ltv} /></td>
-                                            <td className="py-5 px-4 text-right pr-10"><ChangeBadge val={summaryTotals.mom?.payback} inverse /></td>
-                                        </tr>
-                                        <tr>
-                                            <td className="py-5 px-8 text-left uppercase text-indigo-900 font-black text-[11px]">Summary YoY%</td>
-                                            <td className="py-5 px-4 text-right border-t border-slate-100/50"><ChangeBadge val={summaryTotals.yoy?.spend} /></td>
-                                            <td className="py-5 px-4 text-right border-t border-slate-100/50"><ChangeBadge val={summaryTotals.yoy?.regs} /></td>
-                                            <td className="py-5 px-4 text-right border-t border-slate-100/50"><ChangeBadge val={summaryTotals.yoy?.mncs} /></td>
-                                            <td className="py-5 px-4 text-center border-t border-slate-100/50"><ChangeBadge val={summaryTotals.yoy?.cvr} /></td>
-                                            <td className="py-5 px-4 text-center border-t border-slate-100/50"><ChangeBadge val={summaryTotals.yoy?.cpa} inverse /></td>
-                                            <td className="py-5 px-4 text-center border-t border-slate-100/50"><ChangeBadge val={summaryTotals.yoy?.ltv} /></td>
-                                            <td className="py-5 px-4 text-right pr-10 border-t border-slate-100/50"><ChangeBadge val={summaryTotals.yoy?.payback} inverse /></td>
-                                        </tr>
-                                    </tfoot>
-                                )}
-                            </table>
-                        </div>
-
-                        {isOverall && (
-                            <div className="flex flex-col space-y-12 pt-8 border-t border-slate-100">
-                                <div className="narrative-block space-y-6">
-                                    <div className="flex items-center justify-between">
-                                        <div className="flex items-center gap-2 text-[#1a3812] font-black uppercase text-xs tracking-widest"><Icons.Message size={18} /> Strategic Narrative</div>
-                                        {region === 'GLOBAL' && (
-                                            <button onClick={onSyncFromRegions} disabled={isSyncing} className={`no-print flex items-center gap-2 px-6 py-3 rounded-xl text-[11px] font-black uppercase transition-all shadow-lg hover:scale-105 active:scale-95 ${isSyncing ? 'bg-slate-100 text-slate-400 cursor-not-allowed' : 'bg-indigo-600 text-white hover:bg-indigo-500'}`}>
-                                                {isSyncing ? <Icons.Loader size={16} /> : <Icons.Zap size={16} />} Intelligence Sync
-                                            </button>
-                                        )}
-                                    </div>
-                                    <div className="space-y-4">
-                                        <AutoExpandingTextarea isLoading={isSyncing} value={commentary || ''} onChange={(e) => onNarrativeChange(title, e.target.value)} className="p-8 bg-slate-50 rounded-[2rem] border border-slate-100 text-slate-800 text-[15px] italic font-medium leading-relaxed shadow-inner" />
-                                        <div className="px-8 py-4 bg-slate-100/50 rounded-2xl border border-slate-200">
-                                            <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest block mb-2">Performance Baseline</span>
-                                            <p className="text-[13px] text-slate-500 leading-relaxed font-medium">{performanceBaseline}</p>
-                                        </div>
-                                    </div>
-                                </div>
-                                <div className="narrative-block space-y-6">
-                                    <div className="flex items-center gap-2 text-indigo-900 font-black uppercase text-xs tracking-widest"><Icons.Map size={18} /> Next month's plans</div>
-                                    <AutoExpandingTextarea isLoading={isSyncing} value={roadmap || ''} onChange={(e) => onRoadmapSync(title, e.target.value)} className="p-8 bg-indigo-50/20 rounded-[2rem] border border-indigo-100/50 text-slate-800 text-[15px] font-medium leading-relaxed shadow-inner" placeholder="Enter upcoming tactical shifts and optimizations..." />
-                                </div>
-                            </div>
+                <div className="bg-[#f2f2f2] rounded-[1.2rem] py-2 px-2 flex flex-col justify-center items-center min-w-[125px] flex-1 text-center shadow-sm">
+                    <span className="text-wise-forest/70 font-bold text-[11px] uppercase tracking-widest mb-0.5">{title}</span>
+                    <span className="text-wise-forest font-black text-3xl tracking-tighter mb-1 leading-none">{val}</span>
+                    <div className="flex flex-col items-center gap-0 text-[9px] font-bold">
+                        {mom !== undefined && (
+                            <span className={getColor(mom)}>{getSign(mom)}{formatPct(mom)} MoM</span>
+                        )}
+                        {yoy !== undefined && (
+                            <span className={getColor(yoy)}>{getSign(yoy)}{formatPct(yoy)} YoY</span>
                         )}
                     </div>
                 </div>
             );
         };
 
-        function App() {
-            const [data, setData] = useState([]);
-            const [selectedRegion, setSelectedRegion] = useState('GLOBAL');
-            const [selectedMonth, setSelectedMonth] = useState('');
-            const [comments, setComments] = useState({});
-            const [roadmaps, setRoadmaps] = useState({});
-            const [isSyncing, setIsSyncing] = useState(false);
-            const [userKey, setUserKey] = useState("");
-            const [aiGuidance, setAiGuidance] = useState("Focus on MoM growth, identify high-efficiency markets, and pinpoint specific CPA outliers. Use a professional, executive tone.");
-            const [showKeyModal, setShowKeyModal] = useState(false);
-            const [showGuidanceModal, setShowGuidanceModal] = useState(false);
+        const MiniTrend = ({ data, color = "#6366f1", height = 40 }) => {
+            if (!data || data.length < 2) return <div style={{ height }} />;
+            const max = Math.max(...data, 1);
+            const points = data.map((v, i) => `${(i / (data.length - 1)) * 100},${height - (v / max) * height}`).join(' ');
+            return (
+                <svg width="100%" height={height} className="overflow-visible">
+                    <polyline points={points} fill="none" stroke={color} strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" />
+                </svg>
+            );
+        };
 
-            const handleFileUpload = (e) => {
-                const file = e.target.files[0];
+        function App() {
+            const [rawData, setRawData] = useState([]);
+            const [selectedMonth, setSelectedMonth] = useState('');
+            const [apiKey, setApiKey] = useState("");
+            const [narratives, setNarratives] = useState({});
+            const [isSyncing, setIsSyncing] = useState(false);
+            const [headers, setHeaders] = useState([]);
+
+            const renderPlatformPct = (val, metricType, currVal) => {
+                if (val === undefined || val === null || val === 0 || !isFinite(val)) return null;
+                const isPos = val > 0;
+                let good = isPos; 
+                
+                if (metricType === 'spend') good = isPos; 
+                if (metricType === 'cpa') good = !isPos; 
+                if (metricType === 'ltv') good = isPos; 
+                if (metricType === 'payback') {
+                    const prev = currVal / (1 + val);
+                    good = Math.abs(currVal - 15) < Math.abs(prev - 15);
+                }
+                
+                const color = good ? 'text-green-600' : 'text-[#d32f2f]';
+                return (
+                    <div className={`flex flex-col items-end leading-tight ${color}`}>
+                        <span className="text-[12px] font-black">{isPos ? '+' : ''}{(val * 100).toFixed(1)}%</span>
+                    </div>
+                );
+            };
+
+            const renderTablePct = (val, metricType, currVal) => {
+                if (val === undefined || val === null || val === 0 || !isFinite(val)) return null;
+                const isPos = val > 0;
+                let good = isPos; 
+                
+                if (metricType === 'spend') good = isPos; 
+                if (metricType === 'cpa') good = !isPos; 
+                if (metricType === 'ltv') good = isPos; 
+                if (metricType === 'payback') {
+                    const prev = currVal / (1 + val);
+                    good = Math.abs(currVal - 15) < Math.abs(prev - 15);
+                }
+                
+                const color = good ? 'text-green-600' : 'text-[#d32f2f]';
+                return (
+                    <span className={`text-[10px] font-black ${color}`}>{isPos ? '+' : ''}{(val * 100).toFixed(1)}%</span>
+                );
+            };
+
+            const processFile = (file) => {
                 const reader = new FileReader();
                 reader.onload = (ev) => {
-                    const parsed = parseCSV(ev.target.result);
-                    if (parsed.length) {
-                        setData(parsed);
-                        const dates = [...new Set(parsed.map(d => d.date))].sort().reverse();
-                        setSelectedMonth(dates[0]);
-                    }
+                    try {
+                        let text = ev.target.result.replace(/^\uFEFF/, '');
+                        const lines = text.split(/\r?\n/).filter(l => l.trim());
+                        const delimiter = lines[0].includes(';') ? ';' : ',';
+                        const rawRows = parseCSVRows(text, delimiter);
+                        
+                        const mappedHeaders = rawRows[0].map(h => {
+                            const clean = (h || "").trim().toLowerCase().replace(/[^a-z0-9]/g, '');
+                            if (clean.includes('month') || clean.includes('date')) return 'date';
+                            if (clean.includes('region') && !clean.includes('country')) return 'region';
+                            if (clean.includes('platform') || clean.includes('vendor') || clean.includes('source')) return 'platform';
+                            if (clean.includes('country') || clean.includes('market') || clean.includes('entity') || clean.includes('location') || clean.includes('alpha2') || clean.includes('iso')) return 'country';
+                            if (clean.includes('mncs') || clean.includes('deposit') || clean.includes('acq') || clean.includes('conv')) return 'mncs';
+                            if (clean.includes('spend') || clean.includes('cost') || clean.includes('invest')) return 'spend';
+                            if (clean.includes('payback')) return 'payback';
+                            if (clean.includes('ltv')) return 'ltv';
+                            if (clean.includes('regs') || clean.includes('regist')) return 'regs';
+                            return clean;
+                        });
+                        setHeaders(mappedHeaders);
+                        const finalData = rawRows.slice(1).map(row => {
+                            const obj = {};
+                            mappedHeaders.forEach((h, i) => {
+                                let v = (row[i] || "").trim();
+                                if (h === 'platform') {
+                                    const p = v.toLowerCase();
+                                    if (p.includes('google')) v = 'Google AC';
+                                    else if (p.includes('moloco')) v = 'Moloco';
+                                    else if (p.includes('trade') || p.includes('ttd')) v = 'TTD';
+                                    else if (p.includes('avow')) v = 'Avow';
+                                }
+                                obj[h] = v;
+                            });
+                            if (!obj.date) obj.date = "No Date";
+                            if (obj.region) obj.region = obj.region.toUpperCase().replace(/\s/g, '');
+                            return obj;
+                        });
+                        setRawData(finalData);
+                        const dates = [...new Set(finalData.map(r => r.date))].sort().reverse();
+                        setSelectedMonth(dates[0] || "No Date");
+                    } catch (err) { console.error(err); }
                 };
                 reader.readAsText(file);
             };
@@ -416,221 +321,892 @@
             const aggregate = (records) => {
                 let s = 0, m = 0, r = 0, lSum = 0, pWSum = 0;
                 records.forEach(rec => {
-                    const sp = safeParseNum(rec.spend), mn = Math.round(safeParseNum(rec.mncs)), regs = Math.round(safeParseNum(rec.regs)), pb = safeParseNum(rec.payback), ltv = safeParseNum(rec.ltv);
+                    const sp = safeNum(rec.spend), mn = Math.round(safeNum(rec.mncs)), regs = Math.round(safeNum(rec.regs)), pb = safeNum(rec.payback), ltv = safeNum(rec.ltv);
                     s += sp; m += mn; r += regs; lSum += ltv * mn; pWSum += pb * mn;
                 });
                 return { spend: s, mncs: m, regs: r, cpa: m > 0 ? s / m : 0, payback: m > 0 ? pWSum / m : 0, ltv: m > 0 ? lSum / m : 0, cvr: r > 0 ? m / r : 0 };
             };
 
-            const handleIntelligenceSync = async () => {
+            const reportData = useMemo(() => {
+                if (!rawData.length || !selectedMonth) return null;
+                const dates = [...new Set(rawData.map(d => d.date))].sort();
+                const curIdx = dates.indexOf(selectedMonth);
+                
+                // Helper to get date string relative to current
+                const getRelativeDate = (offset) => (curIdx - offset >= 0) ? dates[curIdx - offset] : null;
+                const pmDate = getRelativeDate(1);
+                const pqDate = getRelativeDate(3);
+                const pyDate = getRelativeDate(12);
+
+                const calcShift = (curr, prev) => prev > 0 ? (curr - prev) / prev : 0;
+
+                const buildRegionalData = (regionName) => {
+                    const isGlobal = regionName === 'GLOBAL';
+                    
+                    // Filter Avow out from everything except the Global top-line metrics
+                    const rMatchAll = rawData.filter(d => isGlobal || d.region === regionName);
+                    const rMatchNoAvow = rMatchAll.filter(d => d.platform !== 'Avow');
+                    
+                    const curMatchAll = rMatchAll.filter(d => d.date === selectedMonth);
+                    const curMatchNoAvow = rMatchNoAvow.filter(d => d.date === selectedMonth);
+
+                    const topLevelRecords = isGlobal ? curMatchAll : curMatchNoAvow;
+                    const topLevelHistory = isGlobal ? rMatchAll : rMatchNoAvow;
+
+                    const stats = aggregate(topLevelRecords);
+                    const getComp = (date) => aggregate(topLevelHistory.filter(d => d.date === date));
+                    
+                    const pmS = getComp(pmDate), pqS = getComp(pqDate), pyS = getComp(pyDate);
+
+                    const platformStats = PLATFORMS_UI.map(p => {
+                        const pMatch = rMatchNoAvow.filter(d => d.platform === p);
+                        const curAgg = aggregate(pMatch.filter(d => d.date === selectedMonth));
+                        const pmAgg = aggregate(pMatch.filter(d => d.date === pmDate));
+                        const pqAgg = aggregate(pMatch.filter(d => d.date === pqDate));
+                        const pyAgg = aggregate(pMatch.filter(d => d.date === pyDate));
+                        const trend = dates.slice(-6).map(date => ({ month: date, ...aggregate(pMatch.filter(d => d.date === date)) }));
+                        return { 
+                            name: p, 
+                            ...curAgg, 
+                            trend,
+                            shifts: {
+                                mom: {
+                                    spend: calcShift(curAgg.spend, pmAgg.spend),
+                                    mncs: calcShift(curAgg.mncs, pmAgg.mncs),
+                                    payback: calcShift(curAgg.payback, pmAgg.payback),
+                                    ltv: calcShift(curAgg.ltv, pmAgg.ltv),
+                                    cpa: calcShift(curAgg.cpa, pmAgg.cpa)
+                                },
+                                qoq: {
+                                    spend: calcShift(curAgg.spend, pqAgg.spend),
+                                    mncs: calcShift(curAgg.mncs, pqAgg.mncs),
+                                    payback: calcShift(curAgg.payback, pqAgg.payback),
+                                    ltv: calcShift(curAgg.ltv, pqAgg.ltv),
+                                    cpa: calcShift(curAgg.cpa, pqAgg.cpa)
+                                },
+                                yoy: {
+                                    spend: calcShift(curAgg.spend, pyAgg.spend),
+                                    mncs: calcShift(curAgg.mncs, pyAgg.mncs),
+                                    payback: calcShift(curAgg.payback, pyAgg.payback),
+                                    ltv: calcShift(curAgg.ltv, pyAgg.ltv),
+                                    cpa: calcShift(curAgg.cpa, pyAgg.cpa)
+                                }
+                            }
+                        };
+                    });
+
+                    // --- TABLE GROUPING LOGIC (Using NoAvow data so it stays hidden) ---
+                    const breakDownRecords = curMatchNoAvow;
+                    let dimKey = isGlobal ? 'region' : 'country';
+                    if (!isGlobal && breakDownRecords.every(d => !d.country || d.country === regionName)) {
+                        const candidate = headers.find(h => !['date', 'region', 'platform', 'mncs', 'spend', 'regs', 'payback', 'ltv', 'country'].includes(h));
+                        if (candidate) dimKey = candidate;
+                    }
+
+                    const subLabels = [...new Set(breakDownRecords.map(d => d[dimKey]))].filter(v => v && v.toString().trim() !== "");
+                    
+                    let activeContribs = [];
+                    let inactiveContribs = [];
+
+                    subLabels.forEach(label => {
+                        const marketRecords = breakDownRecords.filter(d => d[dimKey] === label);
+                        const agg = aggregate(marketRecords);
+                        if (agg.spend > 0) activeContribs.push({ label, ...agg });
+                        else if (agg.mncs > 0) inactiveContribs.push({ label, ...agg });
+                    });
+
+                    let finalBreakDown = [...activeContribs].sort((a,b) => b.mncs - a.mncs);
+
+                    if (inactiveContribs.length > 0) {
+                        const restLabel = isGlobal ? "Rest of World" : `Rest of ${regionName}`;
+                        const restAgg = inactiveContribs.reduce((acc, curr) => ({
+                            spend: acc.spend + curr.spend,
+                            regs: acc.regs + curr.regs,
+                            mncs: acc.mncs + curr.mncs,
+                            ltv: acc.ltv + curr.mncs * curr.ltv,
+                            payback: acc.payback + curr.mncs * curr.payback
+                        }), { spend: 0, regs: 0, mncs: 0, ltv: 0, payback: 0 });
+
+                        finalBreakDown.push({
+                            label: restLabel,
+                            ...restAgg,
+                            ltv: restAgg.mncs > 0 ? restAgg.ltv / restAgg.mncs : 0,
+                            payback: restAgg.mncs > 0 ? restAgg.payback / restAgg.mncs : 0,
+                            cpa: restAgg.mncs > 0 ? restAgg.spend / restAgg.mncs : 0,
+                            isGroup: true
+                        });
+                    }
+
+                    return { 
+                        name: regionName, 
+                        stats, 
+                        shifts: {
+                            mom: { spend: calcShift(stats.spend, pmS.spend), mncs: calcShift(stats.mncs, pmS.mncs), payback: calcShift(stats.payback, pmS.payback), ltv: calcShift(stats.ltv, pmS.ltv), cpa: calcShift(stats.cpa, pmS.cpa) },
+                            qoq: { spend: calcShift(stats.spend, pqS.spend), mncs: calcShift(stats.mncs, pqS.mncs), payback: calcShift(stats.payback, pqS.payback), ltv: calcShift(stats.ltv, pqS.ltv), cpa: calcShift(stats.cpa, pqS.cpa) },
+                            yoy: { spend: calcShift(stats.spend, pyS.spend), mncs: calcShift(stats.mncs, pyS.mncs), payback: calcShift(stats.payback, pyS.payback), ltv: calcShift(stats.ltv, pyS.ltv), cpa: calcShift(stats.cpa, pyS.cpa) }
+                        },
+                        platformStats, 
+                        breakDown: finalBreakDown.slice(0, 16), 
+                        dimKey 
+                    };
+                };
+
+                return { global: buildRegionalData('GLOBAL'), regions: REGIONS.map(r => buildRegionalData(r)).filter(r => r.stats.mncs > 0 || r.stats.spend > 0) };
+            }, [rawData, selectedMonth, headers]);
+
+            const runAISync = async () => {
+                if (!apiKey || !reportData) return;
                 setIsSyncing(true);
                 try {
-                    const regionalInputs = REGIONS.filter(r => r !== 'GLOBAL').map(r => {
-                        const nKey = `${r}_${selectedMonth}_Overall`;
-                        const stats = aggregate(data.filter(d => d.region?.toUpperCase() === r && d.date === selectedMonth));
-                        const baseline = stats.mncs > 0 ? `${r} reached ${stats.mncs.toLocaleString()} MNCs at a ${stats.payback.toFixed(1)}m payback.` : "";
-                        const narrative = comments[nKey] || baseline;
-                        const roadmap = roadmaps[nKey] || "";
-                        if (!narrative && !roadmap) return null;
-                        return `--- REGION: ${r} ---\nNARRATIVE: ${narrative}\nPLANS: ${roadmap}`;
-                    }).filter(Boolean).join('\n\n');
-
-                    if (!regionalInputs) { setIsSyncing(false); return; }
-
-                    const systemPrompt = `Guidance: ${aiGuidance}\n\nTask: Analyze regional performance data and manual notes. Synthesize them into a master Global report. Separate your response into two distinct parts using 'NEXT MONTH PLANS START HERE' as a divider. Highlight cross-regional trends and CVR shifts.`;
-                    const result = await callAI(regionalInputs, systemPrompt, userKey);
+                    const regContext = reportData.regions.map(r => `${r.name} Perf: ${narratives[r.name+'_perf']||''} | ${r.name} Plan: ${narratives[r.name+'_plan']||''}`).join('\n');
+                    const prompt = `As a marketing analyst, summarize these regional updates for ${selectedMonth} into a global view.\n\nInput Regional Data:\n${regContext}\n\nOutput a JSON object with four keys:\n1. "GLOBAL_perf": Keep this exact prefix: "In ${getMoName(selectedMonth)}, we drove ${reportData.global.stats.mncs.toLocaleString()} MNCs (${reportData.global.shifts.mom.mncs > 0 ? '+' : ''}${(reportData.global.shifts.mom.mncs * 100).toFixed(1)}% MoM) with a total spend of ${fmtCompactCurr(reportData.global.stats.spend)} (${reportData.global.shifts.mom.spend > 0 ? '+' : ''}${(reportData.global.shifts.mom.spend * 100).toFixed(1)}% MoM). This resulted in a payback of ${reportData.global.stats.payback.toFixed(1)}m (${reportData.global.shifts.mom.payback > 0 ? '+' : ''}${(reportData.global.shifts.mom.payback * 100).toFixed(1)}% MoM)." followed by a double newline, then write a short, high-level summary of the most important performance drivers across all regions (do NOT list every region individually).\n2. "GLOBAL_plan": A bulleted list summarizing the most important, high-priority upcoming plans globally based on the regional plans.\n3. "GAC_perf": A short summary focusing specifically on Google App Campaigns (GAC) global performance based on the regional notes.\n4. "GAC_plan": A bulleted list of upcoming plans specifically related to Google App Campaigns.\n5. "MOLOCO_perf": A short summary focusing specifically on Moloco global performance based on the regional notes.\n6. "MOLOCO_plan": A bulleted list of upcoming plans specifically related to Moloco.\n7. "TTD_perf": A short summary focusing specifically on The Trade Desk (TTD) global performance based on the regional notes.\n8. "TTD_plan": A bulleted list of upcoming plans specifically related to The Trade Desk.`;
                     
-                    const sections = result.split(/NEXT MONTH PLANS START HERE/i);
-                    const globalKey = `GLOBAL_${selectedMonth}_Overall`;
-                    setComments(prev => ({...prev, [globalKey]: sections[0].trim()}));
-                    setRoadmaps(prev => ({...prev, [globalKey]: sections[1]?.trim() || ""}));
-                } catch (err) { 
-                    console.error("Sync Error:", err); 
-                } finally { 
-                    setIsSyncing(false); 
-                }
+                    const res = await fetch("https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-09-2025:generateContent?key=" + apiKey, { method: 'POST', body: JSON.stringify({ contents: [{ parts: [{ text: prompt }] }] }) });
+                    const json = await res.json();
+                    const aiResult = JSON.parse((json.candidates?.[0]?.content?.parts?.[0]?.text || "{}").replace(/```json|```/g, ''));
+                    setNarratives(prev => ({...prev, ...aiResult}));
+                } catch (e) { console.error(e); } finally { setIsSyncing(false); }
             };
 
-            const fullReport = useMemo(() => {
-                if (!data.length || !selectedMonth) return [];
-                const regionsToRun = selectedRegion === 'GLOBAL' ? ['GLOBAL', ...REGIONS] : [selectedRegion];
-                const [y, mNum] = selectedMonth.split('-').map(Number);
-                const pmS = `${mNum === 1 ? y-1 : y}-${String(mNum === 1 ? 12 : mNum-1).padStart(2, '0')}`;
-                const pyS = `${y-1}-${String(mNum).padStart(2, '0')}`;
+            if (!rawData.length) {
+                return (
+                    <div className="flex flex-col items-center justify-center min-h-screen bg-wise-forest p-8">
+                        <div className="bg-white/5 p-16 rounded-[4rem] shadow-2xl text-center max-w-2xl border border-white/10 backdrop-blur-sm">
+                            <div className="w-28 h-28 bg-wise-fast text-wise-forest rounded-full flex items-center justify-center mx-auto mb-10 shadow-[0_0_30px_rgba(159,232,112,0.3)] animate-pulse">
+                                <Icons.Upload size={56} />
+                            </div>
+                            <h1 className="text-5xl font-black text-wise-fast mb-6 tracking-tighter uppercase leading-none">INTELLIGENCE REQUIRED</h1>
+                            <p className="text-white/60 mb-12 font-semibold leading-relaxed tracking-wide text-sm">Upload the latest performance data to generate the automated slide deck. Grouping logic and multi-period comparisons enabled.</p>
+                            <label className="block w-full py-6 bg-wise-fast text-wise-forest rounded-[2rem] font-black uppercase text-lg tracking-widest cursor-pointer hover:bg-white transition-all shadow-[0_0_20px_rgba(159,232,112,0.2)] hover:scale-105 active:scale-95">
+                                Select CSV File
+                                <input type="file" className="hidden" accept=".csv" onChange={(e) => processFile(e.target.files[0])} />
+                            </label>
+                        </div>
+                    </div>
+                );
+            }
 
-                return regionsToRun.map(r => {
-                    const rMatch = data.filter(d => (r === 'GLOBAL' || d.region?.toUpperCase() === r));
-                    const dashboards = PLATFORMS_LIST.map(p => {
-                        const matchAllDates = rMatch.filter(d => (p === 'Overall' || d.platform?.includes(p)));
-                        const trend = [...new Set(data.map(d => d.date))].sort().map(date => ({ month: date, ...aggregate(matchAllDates.filter(d => d.date === date)) }));
-                        const currentRecords = matchAllDates.filter(d => d.date === selectedMonth);
-                        
-                        const uniqueMarkets = [...new Set(currentRecords.map(d => r === 'GLOBAL' ? d.region : d.country))]
-                                              .filter(m => m && m.trim() !== ""); 
-                        
-                        let contribs = uniqueMarkets.map(m => {
-                            const f = (match) => match.filter(d => (r === 'GLOBAL' ? d.region : d.country) === m);
-                            const curAgg = aggregate(f(currentRecords));
-                            const prevAgg = aggregate(f(matchAllDates.filter(d => d.date === pmS)));
-                            const pyAgg = aggregate(f(matchAllDates.filter(d => d.date === pyS)));
-                            return { 
-                                label: m, ...curAgg, 
-                                momChange: prevAgg.mncs ? (curAgg.mncs - prevAgg.mncs)/prevAgg.mncs : 0,
-                                yoyChange: pyAgg.mncs ? (curAgg.mncs - pyAgg.mncs)/pyAgg.mncs : 0
-                            };
-                        });
+            const defaultGlobalPerfText = reportData ? `In ${getMoName(selectedMonth)}, we drove ${reportData.global.stats.mncs.toLocaleString()} MNCs (${reportData.global.shifts.mom.mncs > 0 ? '+' : ''}${(reportData.global.shifts.mom.mncs * 100).toFixed(1)}% MoM) with a total spend of ${fmtCompactCurr(reportData.global.stats.spend)} (${reportData.global.shifts.mom.spend > 0 ? '+' : ''}${(reportData.global.shifts.mom.spend * 100).toFixed(1)}% MoM). This resulted in a payback of ${reportData.global.stats.payback.toFixed(1)}m (${reportData.global.shifts.mom.payback > 0 ? '+' : ''}${(reportData.global.shifts.mom.payback * 100).toFixed(1)}% MoM).` : "";
+            
+            const gacGlobalStats = reportData?.global?.platformStats?.find(p => p.name === 'Google AC');
+            const defaultGACPerfText = gacGlobalStats ? `In ${getMoName(selectedMonth)}, Google App Campaigns drove ${gacGlobalStats.mncs.toLocaleString()} MNCs (${gacGlobalStats.shifts.mom.mncs > 0 ? '+' : ''}${(gacGlobalStats.shifts.mom.mncs * 100).toFixed(1)}% MoM) with a total spend of ${fmtCompactCurr(gacGlobalStats.spend)} (${gacGlobalStats.shifts.mom.spend > 0 ? '+' : ''}${(gacGlobalStats.shifts.mom.spend * 100).toFixed(1)}% MoM). This resulted in a payback of ${gacGlobalStats.payback.toFixed(1)}m (${gacGlobalStats.shifts.mom.payback > 0 ? '+' : ''}${(gacGlobalStats.shifts.mom.payback * 100).toFixed(1)}% MoM).` : "";
 
-                        const activeMarkets = contribs.filter(c => c.spend > 0).sort((a,b) => b.spend - a.spend);
-                        const inactiveMarkets = contribs.filter(c => c.spend <= 0 && c.mncs > 0);
-                        
-                        if (inactiveMarkets.length > 0) {
-                            const restLabel = r === 'GLOBAL' ? "Rest of GLOBAL" : `Rest of ${r}`;
-                            const restAgg = inactiveMarkets.reduce((acc, curr) => ({
-                                spend: acc.spend + curr.spend,
-                                regs: acc.regs + curr.regs,
-                                mncs: acc.mncs + curr.mncs,
-                                ltv: acc.ltv + curr.ltv,
-                                payback: acc.payback + curr.payback
-                            }), { spend: 0, regs: 0, mncs: 0, ltv: 0, payback: 0 });
-                            
-                            activeMarkets.push({
-                                label: restLabel,
-                                ...restAgg,
-                                cpa: restAgg.mncs > 0 ? restAgg.spend / restAgg.mncs : 0,
-                                payback: restAgg.payback / inactiveMarkets.length,
-                                ltv: restAgg.ltv / inactiveMarkets.length,
-                                momChange: 0,
-                                yoyChange: 0
-                            });
-                        }
+            const molocoGlobalStats = reportData?.global?.platformStats?.find(p => p.name === 'Moloco');
+            const defaultMolocoPerfText = molocoGlobalStats ? `In ${getMoName(selectedMonth)}, Moloco drove ${molocoGlobalStats.mncs.toLocaleString()} MNCs (${molocoGlobalStats.shifts.mom.mncs > 0 ? '+' : ''}${(molocoGlobalStats.shifts.mom.mncs * 100).toFixed(1)}% MoM) with a total spend of ${fmtCompactCurr(molocoGlobalStats.spend)} (${molocoGlobalStats.shifts.mom.spend > 0 ? '+' : ''}${(molocoGlobalStats.shifts.mom.spend * 100).toFixed(1)}% MoM). This resulted in a payback of ${molocoGlobalStats.payback.toFixed(1)}m (${molocoGlobalStats.shifts.mom.payback > 0 ? '+' : ''}${(molocoGlobalStats.shifts.mom.payback * 100).toFixed(1)}% MoM).` : "";
 
-                        const curTotal = aggregate(currentRecords);
-                        const pmTotal = aggregate(matchAllDates.filter(d => d.date === pmS));
-                        const pyTotal = aggregate(matchAllDates.filter(d => d.date === pyS));
-                        const calcShift = (c, pVal) => pVal > 0 ? (c - pVal) / pVal : 0;
-                        
-                        const summaryTotals = {
-                            mom: { spend: calcShift(curTotal.spend, pmTotal.spend), regs: calcShift(curTotal.regs, pmTotal.regs), mncs: calcShift(curTotal.mncs, pmTotal.mncs), cvr: calcShift(curTotal.cvr, pmTotal.cvr), cpa: calcShift(curTotal.cpa, pmTotal.cpa), ltv: calcShift(curTotal.ltv, pmTotal.ltv), payback: calcShift(curTotal.payback, pmTotal.payback) },
-                            yoy: { spend: calcShift(curTotal.spend, pyTotal.spend), regs: calcShift(curTotal.regs, pyTotal.regs), mncs: calcShift(curTotal.mncs, pyTotal.mncs), cvr: calcShift(curTotal.cvr, pyTotal.cvr), cpa: calcShift(curTotal.cpa, pyTotal.cpa), ltv: calcShift(curTotal.ltv, pyTotal.ltv), payback: calcShift(curTotal.payback, pyTotal.payback) }
-                        };
+            const ttdGlobalStats = reportData?.global?.platformStats?.find(p => p.name === 'TTD');
+            const defaultTTDPerfText = ttdGlobalStats ? `In ${getMoName(selectedMonth)}, The Trade Desk drove ${ttdGlobalStats.mncs.toLocaleString()} MNCs (${ttdGlobalStats.shifts.mom.mncs > 0 ? '+' : ''}${(ttdGlobalStats.shifts.mom.mncs * 100).toFixed(1)}% MoM) with a total spend of ${fmtCompactCurr(ttdGlobalStats.spend)} (${ttdGlobalStats.shifts.mom.spend > 0 ? '+' : ''}${(ttdGlobalStats.shifts.mom.spend * 100).toFixed(1)}% MoM). This resulted in a payback of ${ttdGlobalStats.payback.toFixed(1)}m (${ttdGlobalStats.shifts.mom.payback > 0 ? '+' : ''}${(ttdGlobalStats.shifts.mom.payback * 100).toFixed(1)}% MoM).` : "";
 
-                        return { title: p, trend, contributionList: activeMarkets, summaryTotals };
-                    });
-                    const curS = aggregate(rMatch.filter(d => d.date === selectedMonth));
-                    const prevS = aggregate(rMatch.filter(d => d.date === pmS));
-                    return { region: r, stats: { cur: curS, mom: { spend: prevS.spend ? (curS.spend-prevS.spend)/prevS.spend : 0, mncs: prevS.mncs ? (curS.mncs-prevS.mncs)/prevS.mncs : 0, payback: prevS.payback ? (curS.payback-prevS.payback)/prevS.payback : 0 } }, dashboards };
-                });
-            }, [data, selectedRegion, selectedMonth]);
 
             return (
-                <div className="min-h-screen pb-32">
-                    {/* Modals */}
-                    {showKeyModal && (
-                        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 no-print">
-                            <div className="bg-white rounded-3xl p-8 max-w-md w-full shadow-2xl scale-in duration-200">
-                                <h3 className="text-xl font-black mb-2 uppercase tracking-tight">OpenAI Configuration</h3>
-                                <p className="text-slate-500 text-sm mb-6 leading-relaxed">Enter your ChatGPT API key (sk-...). This tool uses GPT-4o-mini for reliable synthesis.</p>
-                                <input type="password" value={userKey} onChange={e => setUserKey(e.target.value)} placeholder="sk-..." className="w-full p-4 bg-slate-50 border rounded-2xl mb-6 font-mono text-xs outline-none" />
-                                <div className="flex gap-3">
-                                    <button onClick={() => setShowKeyModal(false)} className="flex-1 py-4 bg-indigo-600 text-white font-black rounded-2xl uppercase text-xs tracking-widest hover:bg-indigo-500">Save & Close</button>
-                                    <button onClick={() => { setUserKey(""); }} className="px-6 py-4 bg-slate-100 text-slate-500 font-black rounded-2xl uppercase text-xs tracking-widest">Clear</button>
-                                </div>
-                            </div>
+                <div className="bg-slate-100 min-h-screen pb-20">
+                    <nav className="no-print sticky top-0 z-50 bg-wise-forest px-8 py-4 flex justify-between items-center shadow-2xl border-b border-white/5">
+                        <div className="flex items-center gap-4">
+                            <Icons.Chart className="text-wise-fast" />
+                            <h2 className="text-white font-black uppercase tracking-tighter text-xl italic">Performance Intelligence <span className="text-white/20 not-italic ml-2">v4.9</span></h2>
                         </div>
-                    )}
-
-                    {showGuidanceModal && (
-                        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 no-print">
-                            <div className="bg-white rounded-3xl p-8 max-w-lg w-full shadow-2xl scale-in duration-200">
-                                <h3 className="text-xl font-black mb-2 uppercase tracking-tight">AI Strategy Console</h3>
-                                <p className="text-slate-500 text-sm mb-6 leading-relaxed">Provide guidance on how the AI should approach the Global synthesis. Define tone, specific metrics to prioritize, or structure.</p>
-                                <textarea 
-                                    value={aiGuidance} 
-                                    onChange={e => setAiGuidance(e.target.value)} 
-                                    className="w-full p-6 bg-slate-50 border rounded-2xl mb-6 text-sm font-medium leading-relaxed h-40 outline-none focus:ring-2 focus:ring-green-600"
-                                />
-                                <button onClick={() => setShowGuidanceModal(false)} className="w-full py-4 bg-[#1a3812] text-white font-black rounded-2xl uppercase text-xs tracking-widest hover:bg-green-700">Update Strategy</button>
-                            </div>
-                        </div>
-                    )}
-
-                    <nav className="w-full bg-[#1a3812] p-8 flex items-center justify-between no-print shadow-2xl border-b-[8px] border-green-900/20">
-                        <div className="flex items-center space-x-4"><Icons.Chart size={28} className="text-green-400" /><h1 className="text-2xl font-black text-white uppercase italic tracking-tighter leading-none">Intelligence Dashboard</h1></div>
-                        <div className="flex gap-4">
-                            {!data.length ? (
-                                <label className="px-10 py-4 bg-green-600 text-white rounded-2xl font-black uppercase text-xs cursor-pointer hover:bg-green-500 shadow-lg transition-all"><Icons.Upload size={20} className="mr-3 inline" /> Connect Data<input type="file" accept=".csv" className="hidden" onChange={handleFileUpload} /></label>
-                            ) : (
-                                <div className="flex gap-4">
-                                    <button onClick={() => setShowGuidanceModal(true)} title="AI Strategy" className="p-4 rounded-2xl bg-white/10 text-white/50 hover:bg-white/20 transition-all"><Icons.Brain size={20} /></button>
-                                    <button onClick={() => setShowKeyModal(true)} title="Set API Key" className={`p-4 rounded-2xl transition-all ${userKey.trim() ? 'bg-green-500/20 text-green-400' : 'bg-white/10 text-white/50 hover:bg-white/20'}`}><Icons.Key size={20} /></button>
-                                    <div className="flex bg-white/10 p-1 rounded-2xl border border-white/10">
-                                        <select value={selectedMonth} onChange={e => setSelectedMonth(e.target.value)} className="bg-transparent text-white font-bold px-4 py-2 outline-none text-xs">
-                                            {[...new Set(data.map(d => d.date))].sort().reverse().map(d => <option key={d} value={d} className="text-black">{d}</option>)}
-                                        </select>
-                                        <select value={selectedRegion} onChange={e => setSelectedRegion(e.target.value)} className="bg-transparent text-white font-bold px-4 py-2 outline-none text-xs border-l border-white/10"><option value="GLOBAL" className="text-black">GLOBAL</option>{REGIONS.map(r => <option key={r} value={r} className="text-black">{r}</option>)}</select>
-                                    </div>
-                                    <button onClick={() => window.print()} className="bg-white text-[#1a3812] px-8 py-4 rounded-2xl font-black text-xs uppercase shadow-lg hover:bg-green-50 hover:scale-105 transition-transform">Export PDF</button>
-                                    <button onClick={() => setData([])} className="bg-red-500/20 p-4 rounded-2xl text-red-100 hover:bg-red-600 transition-colors"><Icons.X size={20} /></button>
-                                </div>
-                            )}
+                        <div className="flex items-center gap-3">
+                            <label className="bg-white/10 hover:bg-white/20 text-white text-[10px] font-black uppercase tracking-widest px-6 py-3 rounded-2xl cursor-pointer transition-all border border-white/10">
+                                Connect Source
+                                <input type="file" className="hidden" accept=".csv" onChange={(e) => processFile(e.target.files[0])} />
+                            </label>
+                            <select value={selectedMonth} onChange={e => setSelectedMonth(e.target.value)} className="bg-white/10 border border-white/20 text-white font-bold text-xs px-6 py-3 rounded-2xl outline-none">
+                                {[...new Set(rawData.map(d => d.date))].sort().reverse().map(d => <option key={d} value={d} className="text-black">{d}</option>)}
+                            </select>
+                            <input type="password" placeholder="Gemini Key" value={apiKey} onChange={e => setApiKey(e.target.value)} className="bg-white/10 border border-white/20 text-white text-xs px-6 py-3 rounded-2xl outline-none w-32 focus:w-64 transition-all" />
+                            <button onClick={runAISync} disabled={isSyncing} className="bg-indigo-600 text-white px-8 py-3 rounded-2xl font-black text-xs uppercase hover:bg-indigo-500 flex items-center gap-3 shadow-lg active:scale-95 transition-transform">
+                                {isSyncing ? <Icons.Loader size={16} /> : <Icons.Zap size={16} />} Sync
+                            </button>
+                            <button onClick={() => window.print()} className="bg-white text-wise-forest px-10 py-3 rounded-2xl font-black text-xs uppercase hover:bg-slate-50 shadow-2xl transition-transform active:scale-95">Export Deck</button>
+                            <button onClick={() => setRawData([])} className="text-white/30 hover:text-red-400 transition-colors ml-6"><Icons.X size={28}/></button>
                         </div>
                     </nav>
 
-                    <div className="max-w-5xl mx-auto p-12">
-                        {data.length > 0 ? (
-                            fullReport.map((rData, rIdx) => (
-                                <div key={rData.region} className={`space-y-0 ${rIdx > 0 ? 'region-section' : ''} animate-in`}>
-                                    {/* REGION HEADER & KPIs - Always Page 1 of Region */}
-                                    <header className="border-l-[12px] border-green-600 pl-12 py-6 mb-16">
-                                        <h2 className="text-8xl font-black text-slate-900 tracking-tighter uppercase leading-none">{rData.region} <span className="text-green-600 block">{selectedMonth}</span></h2>
-                                        <p className="text-slate-400 font-black uppercase tracking-[0.6em] mt-8 text-[11px]">Performance Intelligence Dossier</p>
-                                    </header>
+                    <div className="slide-content">
+                        {/* Slide 1: Cover */}
+                        <div className="slide-container bg-wise-forest overflow-hidden relative">
+                            <div className="flex flex-col justify-between h-full relative z-10 w-full">
+                                <h1 className="text-wise-fast font-black uppercase tracking-tighter" style={{ fontSize: '8.5rem', lineHeight: '0.9' }}>
+                                    PAID DISPLAY<br/>MONTHLY<br/>PERFORMANCE
+                                </h1>
+                                <h3 className="text-wise-fast font-bold text-[3rem]">
+                                    {formatCoverDate(selectedMonth)}
+                                </h3>
+                            </div>
+                        </div>
 
-                                    {/* Responsive KPI Cards: reduced text size to prevent overflow & decimals removed */}
-                                    <div className="grid grid-cols-1 md:grid-cols-3 gap-8 mb-16">
-                                        {[{ l: 'Total Investment', v: formatAccurateCurrency(rData.stats.cur.spend), ch: rData.stats.mom.spend, inv: false }, { l: 'Growth (MNCs)', v: rData.stats.cur.mncs.toLocaleString(), ch: rData.stats.mom.mncs, inv: false }, { l: 'Weighted Payback', v: `${rData.stats.cur.payback.toFixed(1)}m`, ch: rData.stats.mom.payback, inv: true }].map((k, i) => (
-                                            <div key={i} className="bg-white rounded-[3rem] p-8 border shadow-xl flex flex-col justify-between overflow-hidden">
-                                                <div className="flex justify-between items-start mb-6"><span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">{k.l}</span><ChangeBadge val={k.ch} inverse={k.inv} /></div>
-                                                <span className="text-3xl font-black text-slate-900 tracking-tighter leading-none break-words">{k.v}</span>
-                                            </div>
-                                        ))}
+                        {/* Slide 2: Section Divider - Performance Overview */}
+                        <div className="slide-container bg-wise-fast overflow-hidden relative">
+                            <h1 className="text-wise-forest font-black uppercase tracking-tighter" style={{ fontSize: '8.5rem', lineHeight: '0.9' }}>
+                                PERFORMANCE<br/>OVERVIEW
+                            </h1>
+                            <div className="absolute bottom-[0.5cm] left-[0.5cm]">
+                                <span className="text-wise-forest/60 font-black tracking-tighter" style={{ fontSize: '10rem', lineHeight: '1' }}>
+                                    01
+                                </span>
+                            </div>
+                        </div>
+
+                        {/* Slide 3: Global Overview */}
+                        {reportData && (
+                            <div className="slide-container">
+                                <div className="flex justify-between items-start mb-4 w-full gap-3">
+                                    <div className="bg-wise-fast text-wise-forest font-black uppercase rounded-r-full flex flex-col justify-center -ml-[0.5cm] pl-[0.5cm] pr-10 py-2" style={{ fontSize: '2.5rem', lineHeight: '1.1' }}>
+                                        <span className="tracking-tighter">PAID DISPLAY</span>
+                                        <span className="tracking-tighter">PERFORMANCE</span>
                                     </div>
-
-                                    {/* DASHBOARDS - Rendered with split logic for PDF */}
-                                    {rData.dashboards.map((dash, dashIdx) => (
-                                        <PlatformDashboard 
-                                            key={dash.title} 
-                                            region={rData.region} 
-                                            month={selectedMonth} 
-                                            title={dash.title} 
-                                            dashboard={dash} 
-                                            isOverall={dash.title === 'Overall'} 
-                                            isGlobal={rData.region === 'GLOBAL'}
-                                            onNarrativeChange={(p, t) => setComments(prev => ({ ...prev, [`${rData.region}_${selectedMonth}_${dash.title}`]: t }))}
-                                            onRoadmapSync={(p, t) => setRoadmaps(prev => ({ ...prev, [`${rData.region}_${selectedMonth}_${dash.title}`]: t }))}
-                                            onSyncFromRegions={handleIntelligenceSync} 
-                                            isSyncing={isSyncing}
-                                            commentary={comments[`${rData.region}_${selectedMonth}_${dash.title}`]}
-                                            roadmap={roadmaps[`${rData.region}_${selectedMonth}_${dash.title}`]}
-                                        />
-                                    ))}
+                                    
+                                    <div className="flex gap-2 flex-1 justify-end">
+                                        <MetricCard title="Spend" val={fmtCompactCurr(reportData.global.stats.spend)} mom={reportData.global.shifts.mom.spend} yoy={reportData.global.shifts.yoy.spend} inverse={false} rawVal={reportData.global.stats.spend} />
+                                        <MetricCard title="MNCs" val={fmtCompactNum(reportData.global.stats.mncs)} mom={reportData.global.shifts.mom.mncs} yoy={reportData.global.shifts.yoy.mncs} inverse={false} rawVal={reportData.global.stats.mncs} />
+                                        <MetricCard title="LTV" val={`£${reportData.global.stats.ltv.toFixed(2)}`} mom={reportData.global.shifts.mom.ltv} yoy={reportData.global.shifts.yoy.ltv} inverse={false} rawVal={reportData.global.stats.ltv} />
+                                        <MetricCard title="CPA" val={`£${reportData.global.stats.cpa.toFixed(0)}`} mom={reportData.global.shifts.mom.cpa} yoy={reportData.global.shifts.yoy.cpa} inverse={true} rawVal={reportData.global.stats.cpa} />
+                                        <MetricCard title="Payback" val={reportData.global.stats.payback.toFixed(1) + 'm'} mom={reportData.global.shifts.mom.payback} yoy={reportData.global.shifts.yoy.payback} inverse={true} rawVal={reportData.global.stats.payback} />
+                                    </div>
                                 </div>
-                            ))
-                        ) : (
-                            <div className="flex flex-col items-center justify-center min-h-[60vh] text-center no-print bg-white p-24 rounded-[5rem] shadow-2xl border border-slate-100">
-                                <Icons.Chart size={100} className="text-green-600 mx-auto mb-10 transform -rotate-12" />
-                                <h3 className="text-6xl font-black text-slate-900 tracking-tighter mb-6 uppercase leading-none">Intelligence Required</h3>
-                                <p className="text-slate-400 font-bold mb-12 text-2xl">Connect your CSV source to begin automated reporting.</p>
-                                <label className="inline-flex items-center px-16 py-8 bg-[#1a3812] text-white rounded-[2.5rem] font-black uppercase cursor-pointer hover:scale-105 transition-all shadow-2xl shadow-green-900/20">
-                                    <Icons.Upload size={24} className="mr-4" /> Select Market Data
-                                    <input type="file" accept=".csv" className="hidden" onChange={handleFileUpload} />
-                                </label>
+                                
+                                <div className="grid grid-cols-12 gap-4 flex-1 overflow-hidden min-h-0">
+                                    <div className="col-span-5 flex flex-col h-full">
+                                        <div className="flex-1 bg-slate-50 border-2 border-white rounded-[2rem] p-4 shadow-inner flex flex-col relative overflow-hidden min-h-0">
+                                            <h4 className="text-slate-400 text-[11px] font-black uppercase tracking-[0.3em] mb-2 flex items-center gap-2">
+                                                <Icons.Info size={16} /> Platform Split
+                                            </h4>
+                                            <div className="flex-1 overflow-y-auto pr-2">
+                                                <table className="w-full text-[13px] font-bold border-collapse">
+                                                    <thead className="text-slate-400 uppercase tracking-widest border-b-2 border-slate-200">
+                                                        <tr>
+                                                            <th className="py-1.5 px-2 text-left">Platform</th>
+                                                            {reportData.global.platformStats.map((p, i) => (
+                                                                <th key={i} className="py-1.5 px-2 text-right">{p.name}</th>
+                                                            ))}
+                                                        </tr>
+                                                    </thead>
+                                                    <tbody className="divide-y-2 divide-slate-100">
+                                                        <tr className="hover:bg-white transition-colors">
+                                                            <td className="py-2 px-2 uppercase text-slate-700 font-black">Spend</td>
+                                                            {reportData.global.platformStats.map((p, i) => (
+                                                                <td key={i} className="py-2 px-2 text-right">
+                                                                    <div className="flex flex-col items-end gap-0.5">
+                                                                        <span className="font-black text-slate-900 text-[14px]">{fmtCompactCurr(p.spend)}</span>
+                                                                        {renderTablePct(p.shifts?.mom?.spend, 'spend', p.spend)}
+                                                                    </div>
+                                                                </td>
+                                                            ))}
+                                                        </tr>
+                                                        <tr className="hover:bg-white transition-colors">
+                                                            <td className="py-2 px-2 uppercase text-slate-700 font-black">MNCs</td>
+                                                            {reportData.global.platformStats.map((p, i) => (
+                                                                <td key={i} className="py-2 px-2 text-right">
+                                                                    <div className="flex flex-col items-end gap-0.5">
+                                                                        <span className="font-black text-slate-900 text-[14px]">{p.mncs.toLocaleString()}</span>
+                                                                        {renderTablePct(p.shifts?.mom?.mncs, 'mncs', p.mncs)}
+                                                                    </div>
+                                                                </td>
+                                                            ))}
+                                                        </tr>
+                                                        <tr className="hover:bg-white transition-colors">
+                                                            <td className="py-2 px-2 uppercase text-slate-700 font-black">LTV</td>
+                                                            {reportData.global.platformStats.map((p, i) => (
+                                                                <td key={i} className="py-2 px-2 text-right">
+                                                                    <div className="flex flex-col items-end gap-0.5">
+                                                                        <span className="font-black text-slate-900 text-[14px]">£{p.ltv.toFixed(2)}</span>
+                                                                        {renderTablePct(p.shifts?.mom?.ltv, 'ltv', p.ltv)}
+                                                                    </div>
+                                                                </td>
+                                                            ))}
+                                                        </tr>
+                                                        <tr className="hover:bg-white transition-colors">
+                                                            <td className="py-2 px-2 uppercase text-slate-700 font-black">CPA</td>
+                                                            {reportData.global.platformStats.map((p, i) => (
+                                                                <td key={i} className="py-2 px-2 text-right">
+                                                                    <div className="flex flex-col items-end gap-0.5">
+                                                                        <span className="font-black text-slate-900 text-[14px]">£{p.cpa.toFixed(0)}</span>
+                                                                        {renderTablePct(p.shifts?.mom?.cpa, 'cpa', p.cpa)}
+                                                                    </div>
+                                                                </td>
+                                                            ))}
+                                                        </tr>
+                                                        <tr className="hover:bg-white transition-colors">
+                                                            <td className="py-2 px-2 uppercase text-slate-700 font-black">PB</td>
+                                                            {reportData.global.platformStats.map((p, i) => (
+                                                                <td key={i} className="py-2 px-2 text-right">
+                                                                    <div className="flex flex-col items-end gap-0.5">
+                                                                        <span className="font-black text-slate-900 text-[14px]">{p.payback.toFixed(1) + 'm'}</span>
+                                                                        {renderTablePct(p.shifts?.mom?.payback, 'payback', p.payback)}
+                                                                    </div>
+                                                                </td>
+                                                            ))}
+                                                        </tr>
+                                                    </tbody>
+                                                </table>
+                                            </div>
+                                            <div className="text-[10px] text-slate-400 font-semibold italic text-right px-2 mt-2">
+                                                * All percentage shifts indicate Month-over-Month (MoM) comparisons.
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <div className="col-span-7 flex flex-col gap-4 h-full">
+                                        <div className="flex-1 bg-wise-forest rounded-[2rem] p-6 shadow-2xl flex flex-col relative overflow-hidden h-full">
+                                            <div className="absolute -top-16 -right-16 p-12 opacity-5"><Icons.Zap size={300} className="text-white" /></div>
+                                            <h4 className="text-wise-fast text-[12px] font-black uppercase tracking-[0.4em] mb-4 flex items-center gap-2">
+                                                <Icons.Zap size={18} /> Performance
+                                            </h4>
+                                            <textarea 
+                                                className="bg-transparent text-white w-full h-full resize-none outline-none font-medium text-[14px] leading-[1.6] placeholder:text-white/20 relative z-10" 
+                                                placeholder="Enter performance notes..."
+                                                value={narratives['GLOBAL_perf'] !== undefined ? narratives['GLOBAL_perf'] : defaultGlobalPerfText} 
+                                                onChange={e => setNarratives({...narratives, 'GLOBAL_perf': e.target.value})}
+                                            />
+                                        </div>
+                                        
+                                        <div className="flex-1 bg-slate-50 border-2 border-white rounded-[2rem] p-6 shadow-inner flex flex-col relative overflow-hidden h-full">
+                                            <h4 className="text-slate-400 text-[11px] font-black uppercase tracking-[0.3em] mb-3 flex items-center gap-2">
+                                                <Icons.Calendar size={18} /> Next Month's Plans
+                                            </h4>
+                                            <textarea 
+                                                className="bg-transparent text-slate-700 w-full h-full resize-none outline-none font-medium text-[13px] leading-[1.6] placeholder:text-slate-400" 
+                                                placeholder="Enter plans for next month..."
+                                                value={narratives['GLOBAL_plan'] || ""}
+                                                onChange={e => setNarratives({...narratives, 'GLOBAL_plan': e.target.value})}
+                                            />
+                                        </div>
+                                    </div>
+                                </div>
                             </div>
                         )}
+
+                        {/* Slide 3.5: Google App Campaigns Overview */}
+                        {reportData && gacGlobalStats && (
+                            <div className="slide-container">
+                                <div className="flex justify-between items-start mb-4 w-full gap-3">
+                                    <div className="bg-wise-fast text-wise-forest font-black uppercase rounded-r-full flex flex-col justify-center -ml-[0.5cm] pl-[0.5cm] pr-10 py-2" style={{ fontSize: '2.1rem', lineHeight: '1.1' }}>
+                                        <span className="tracking-tighter">GOOGLE APP CAMPAIGNS</span>
+                                        <span className="tracking-tighter">PERFORMANCE</span>
+                                    </div>
+                                    
+                                    <div className="flex gap-2 flex-1 justify-end">
+                                        <MetricCard title="Spend" val={fmtCompactCurr(gacGlobalStats.spend)} mom={gacGlobalStats.shifts?.mom?.spend} yoy={gacGlobalStats.shifts?.yoy?.spend} inverse={false} rawVal={gacGlobalStats.spend} />
+                                        <MetricCard title="MNCs" val={fmtCompactNum(gacGlobalStats.mncs)} mom={gacGlobalStats.shifts?.mom?.mncs} yoy={gacGlobalStats.shifts?.yoy?.mncs} inverse={false} rawVal={gacGlobalStats.mncs} />
+                                        <MetricCard title="LTV" val={`£${gacGlobalStats.ltv.toFixed(2)}`} mom={gacGlobalStats.shifts?.mom?.ltv} yoy={gacGlobalStats.shifts?.yoy?.ltv} inverse={false} rawVal={gacGlobalStats.ltv} />
+                                        <MetricCard title="CPA" val={`£${gacGlobalStats.cpa.toFixed(0)}`} mom={gacGlobalStats.shifts?.mom?.cpa} yoy={gacGlobalStats.shifts?.yoy?.cpa} inverse={true} rawVal={gacGlobalStats.cpa} />
+                                        <MetricCard title="Payback" val={gacGlobalStats.payback.toFixed(1) + 'm'} mom={gacGlobalStats.shifts?.mom?.payback} yoy={gacGlobalStats.shifts?.yoy?.payback} inverse={true} rawVal={gacGlobalStats.payback} />
+                                    </div>
+                                </div>
+                                
+                                <div className="grid grid-cols-12 gap-4 flex-1 overflow-hidden min-h-0">
+                                    <div className="col-span-5 flex flex-col h-full">
+                                        <div className="flex-1 bg-slate-50 border-2 border-white rounded-[2rem] p-4 shadow-inner flex flex-col relative overflow-hidden min-h-0">
+                                            <h4 className="text-slate-400 text-[11px] font-black uppercase tracking-[0.3em] mb-2 flex items-center gap-2">
+                                                <Icons.Info size={16} /> Region Split
+                                            </h4>
+                                            <div className="flex-1 overflow-y-auto pr-2">
+                                                <table className="w-full text-[13px] font-bold border-collapse">
+                                                    <thead className="text-slate-400 uppercase tracking-widest border-b-2 border-slate-200 sticky top-0 bg-slate-50 z-10">
+                                                        <tr>
+                                                            <th className="py-1.5 px-2 text-left">Region</th>
+                                                            <th className="py-1.5 px-2 text-right">Spend</th>
+                                                            <th className="py-1.5 px-2 text-right">MNCs</th>
+                                                            <th className="py-1.5 px-2 text-right">LTV</th>
+                                                            <th className="py-1.5 px-2 text-right">CPA</th>
+                                                            <th className="py-1.5 px-2 text-right">PB</th>
+                                                        </tr>
+                                                    </thead>
+                                                    <tbody className="divide-y-2 divide-slate-100">
+                                                        {reportData.regions.map((reg, i) => {
+                                                            const p = reg.platformStats.find(platform => platform.name === 'Google AC');
+                                                            if (!p || (p.mncs === 0 && p.spend === 0)) return null;
+                                                            return (
+                                                                <tr key={i} className="hover:bg-white transition-colors">
+                                                                    <td className="py-2 px-2 uppercase text-slate-700 font-black">{reg.name}</td>
+                                                                    <td className="py-2 px-2 text-right">
+                                                                        <div className="flex flex-col items-end gap-0.5">
+                                                                            <span className="font-black text-slate-900 text-[14px]">{fmtCompactCurr(p.spend)}</span>
+                                                                            {renderTablePct(p.shifts?.mom?.spend, 'spend', p.spend)}
+                                                                        </div>
+                                                                    </td>
+                                                                    <td className="py-2 px-2 text-right">
+                                                                        <div className="flex flex-col items-end gap-0.5">
+                                                                            <span className="font-black text-slate-900 text-[14px]">{p.mncs.toLocaleString()}</span>
+                                                                            {renderTablePct(p.shifts?.mom?.mncs, 'mncs', p.mncs)}
+                                                                        </div>
+                                                                    </td>
+                                                                    <td className="py-2 px-2 text-right">
+                                                                        <div className="flex flex-col items-end gap-0.5">
+                                                                            <span className="font-black text-slate-900 text-[14px]">£{p.ltv.toFixed(2)}</span>
+                                                                            {renderTablePct(p.shifts?.mom?.ltv, 'ltv', p.ltv)}
+                                                                        </div>
+                                                                    </td>
+                                                                    <td className="py-2 px-2 text-right">
+                                                                        <div className="flex flex-col items-end gap-0.5">
+                                                                            <span className="font-black text-slate-900 text-[14px]">£{p.cpa.toFixed(0)}</span>
+                                                                            {renderTablePct(p.shifts?.mom?.cpa, 'cpa', p.cpa)}
+                                                                        </div>
+                                                                    </td>
+                                                                    <td className="py-2 px-2 text-right">
+                                                                        <div className="flex flex-col items-end gap-0.5">
+                                                                            <span className="font-black text-slate-900 text-[14px]">{p.payback.toFixed(1)}m</span>
+                                                                            {renderTablePct(p.shifts?.mom?.payback, 'payback', p.payback)}
+                                                                        </div>
+                                                                    </td>
+                                                                </tr>
+                                                            );
+                                                        })}
+                                                    </tbody>
+                                                </table>
+                                            </div>
+                                            <div className="text-[10px] text-slate-400 font-semibold italic text-right px-2 mt-2">
+                                                * All percentage shifts indicate Month-over-Month (MoM) comparisons.
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <div className="col-span-7 flex flex-col gap-4 h-full">
+                                        <div className="flex-1 bg-wise-forest rounded-[2rem] p-6 shadow-2xl flex flex-col relative overflow-hidden h-full">
+                                            <div className="absolute -top-16 -right-16 p-12 opacity-5"><Icons.Zap size={300} className="text-white" /></div>
+                                            <h4 className="text-wise-fast text-[12px] font-black uppercase tracking-[0.4em] mb-4 flex items-center gap-2">
+                                                <Icons.Zap size={18} /> Performance
+                                            </h4>
+                                            <textarea 
+                                                className="bg-transparent text-white w-full h-full resize-none outline-none font-medium text-[14px] leading-[1.6] placeholder:text-white/20 relative z-10" 
+                                                placeholder="Enter Google App Campaigns performance notes..."
+                                                value={narratives['GAC_perf'] !== undefined ? narratives['GAC_perf'] : defaultGACPerfText} 
+                                                onChange={e => setNarratives({...narratives, 'GAC_perf': e.target.value})}
+                                            />
+                                        </div>
+                                        
+                                        <div className="flex-1 bg-slate-50 border-2 border-white rounded-[2rem] p-6 shadow-inner flex flex-col relative overflow-hidden h-full">
+                                            <h4 className="text-slate-400 text-[11px] font-black uppercase tracking-[0.3em] mb-3 flex items-center gap-2">
+                                                <Icons.Calendar size={18} /> Next Month's Plans
+                                            </h4>
+                                            <textarea 
+                                                className="bg-transparent text-slate-700 w-full h-full resize-none outline-none font-medium text-[13px] leading-[1.6] placeholder:text-slate-400" 
+                                                placeholder="Enter Google App Campaigns plans for next month..."
+                                                value={narratives['GAC_plan'] || ""}
+                                                onChange={e => setNarratives({...narratives, 'GAC_plan': e.target.value})}
+                                            />
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        )}
+
+                        {/* Slide 3.6: Moloco Overview */}
+                        {reportData && molocoGlobalStats && (
+                            <div className="slide-container">
+                                <div className="flex justify-between items-start mb-4 w-full gap-3">
+                                    <div className="bg-wise-fast text-wise-forest font-black uppercase rounded-r-full flex flex-col justify-center -ml-[0.5cm] pl-[0.5cm] pr-10 py-2" style={{ fontSize: '2rem', lineHeight: '1.1' }}>
+                                        <span className="tracking-tighter">MOLOCO</span>
+                                        <span className="tracking-tighter">PERFORMANCE</span>
+                                    </div>
+                                    
+                                    <div className="flex gap-2 flex-1 justify-end">
+                                        <MetricCard title="Spend" val={fmtCompactCurr(molocoGlobalStats.spend)} mom={molocoGlobalStats.shifts?.mom?.spend} yoy={molocoGlobalStats.shifts?.yoy?.spend} inverse={false} rawVal={molocoGlobalStats.spend} />
+                                        <MetricCard title="MNCs" val={fmtCompactNum(molocoGlobalStats.mncs)} mom={molocoGlobalStats.shifts?.mom?.mncs} yoy={molocoGlobalStats.shifts?.yoy?.mncs} inverse={false} rawVal={molocoGlobalStats.mncs} />
+                                        <MetricCard title="LTV" val={`£${molocoGlobalStats.ltv.toFixed(2)}`} mom={molocoGlobalStats.shifts?.mom?.ltv} yoy={molocoGlobalStats.shifts?.yoy?.ltv} inverse={false} rawVal={molocoGlobalStats.ltv} />
+                                        <MetricCard title="CPA" val={`£${molocoGlobalStats.cpa.toFixed(0)}`} mom={molocoGlobalStats.shifts?.mom?.cpa} yoy={molocoGlobalStats.shifts?.yoy?.cpa} inverse={true} rawVal={molocoGlobalStats.cpa} />
+                                        <MetricCard title="Payback" val={molocoGlobalStats.payback.toFixed(1) + 'm'} mom={molocoGlobalStats.shifts?.mom?.payback} yoy={molocoGlobalStats.shifts?.yoy?.payback} inverse={true} rawVal={molocoGlobalStats.payback} />
+                                    </div>
+                                </div>
+                                
+                                <div className="grid grid-cols-12 gap-4 flex-1 overflow-hidden min-h-0">
+                                    <div className="col-span-5 flex flex-col h-full">
+                                        <div className="flex-1 bg-slate-50 border-2 border-white rounded-[2rem] p-4 shadow-inner flex flex-col relative overflow-hidden min-h-0">
+                                            <h4 className="text-slate-400 text-[11px] font-black uppercase tracking-[0.3em] mb-2 flex items-center gap-2">
+                                                <Icons.Info size={16} /> Region Split
+                                            </h4>
+                                            <div className="flex-1 overflow-y-auto pr-2">
+                                                <table className="w-full text-[13px] font-bold border-collapse">
+                                                    <thead className="text-slate-400 uppercase tracking-widest border-b-2 border-slate-200 sticky top-0 bg-slate-50 z-10">
+                                                        <tr>
+                                                            <th className="py-1.5 px-2 text-left">Region</th>
+                                                            <th className="py-1.5 px-2 text-right">Spend</th>
+                                                            <th className="py-1.5 px-2 text-right">MNCs</th>
+                                                            <th className="py-1.5 px-2 text-right">LTV</th>
+                                                            <th className="py-1.5 px-2 text-right">CPA</th>
+                                                            <th className="py-1.5 px-2 text-right">PB</th>
+                                                        </tr>
+                                                    </thead>
+                                                    <tbody className="divide-y-2 divide-slate-100">
+                                                        {reportData.regions.map((reg, i) => {
+                                                            const p = reg.platformStats.find(platform => platform.name === 'Moloco');
+                                                            if (!p || (p.mncs === 0 && p.spend === 0)) return null;
+                                                            return (
+                                                                <tr key={i} className="hover:bg-white transition-colors">
+                                                                    <td className="py-2 px-2 uppercase text-slate-700 font-black">{reg.name}</td>
+                                                                    <td className="py-2 px-2 text-right">
+                                                                        <div className="flex flex-col items-end gap-0.5">
+                                                                            <span className="font-black text-slate-900 text-[14px]">{fmtCompactCurr(p.spend)}</span>
+                                                                            {renderTablePct(p.shifts?.mom?.spend, 'spend', p.spend)}
+                                                                        </div>
+                                                                    </td>
+                                                                    <td className="py-2 px-2 text-right">
+                                                                        <div className="flex flex-col items-end gap-0.5">
+                                                                            <span className="font-black text-slate-900 text-[14px]">{p.mncs.toLocaleString()}</span>
+                                                                            {renderTablePct(p.shifts?.mom?.mncs, 'mncs', p.mncs)}
+                                                                        </div>
+                                                                    </td>
+                                                                    <td className="py-2 px-2 text-right">
+                                                                        <div className="flex flex-col items-end gap-0.5">
+                                                                            <span className="font-black text-slate-900 text-[14px]">£{p.ltv.toFixed(2)}</span>
+                                                                            {renderTablePct(p.shifts?.mom?.ltv, 'ltv', p.ltv)}
+                                                                        </div>
+                                                                    </td>
+                                                                    <td className="py-2 px-2 text-right">
+                                                                        <div className="flex flex-col items-end gap-0.5">
+                                                                            <span className="font-black text-slate-900 text-[14px]">£{p.cpa.toFixed(0)}</span>
+                                                                            {renderTablePct(p.shifts?.mom?.cpa, 'cpa', p.cpa)}
+                                                                        </div>
+                                                                    </td>
+                                                                    <td className="py-2 px-2 text-right">
+                                                                        <div className="flex flex-col items-end gap-0.5">
+                                                                            <span className="font-black text-slate-900 text-[14px]">{p.payback.toFixed(1)}m</span>
+                                                                            {renderTablePct(p.shifts?.mom?.payback, 'payback', p.payback)}
+                                                                        </div>
+                                                                    </td>
+                                                                </tr>
+                                                            );
+                                                        })}
+                                                    </tbody>
+                                                </table>
+                                            </div>
+                                            <div className="text-[10px] text-slate-400 font-semibold italic text-right px-2 mt-2">
+                                                * All percentage shifts indicate Month-over-Month (MoM) comparisons.
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <div className="col-span-7 flex flex-col gap-4 h-full">
+                                        <div className="flex-1 bg-wise-forest rounded-[2rem] p-6 shadow-2xl flex flex-col relative overflow-hidden h-full">
+                                            <div className="absolute -top-16 -right-16 p-12 opacity-5"><Icons.Zap size={300} className="text-white" /></div>
+                                            <h4 className="text-wise-fast text-[12px] font-black uppercase tracking-[0.4em] mb-4 flex items-center gap-2">
+                                                <Icons.Zap size={18} /> Performance
+                                            </h4>
+                                            <textarea 
+                                                className="bg-transparent text-white w-full h-full resize-none outline-none font-medium text-[14px] leading-[1.6] placeholder:text-white/20 relative z-10" 
+                                                placeholder="Enter Moloco performance notes..."
+                                                value={narratives['MOLOCO_perf'] !== undefined ? narratives['MOLOCO_perf'] : defaultMolocoPerfText} 
+                                                onChange={e => setNarratives({...narratives, 'MOLOCO_perf': e.target.value})}
+                                            />
+                                        </div>
+                                        
+                                        <div className="flex-1 bg-slate-50 border-2 border-white rounded-[2rem] p-6 shadow-inner flex flex-col relative overflow-hidden h-full">
+                                            <h4 className="text-slate-400 text-[11px] font-black uppercase tracking-[0.3em] mb-3 flex items-center gap-2">
+                                                <Icons.Calendar size={18} /> Next Month's Plans
+                                            </h4>
+                                            <textarea 
+                                                className="bg-transparent text-slate-700 w-full h-full resize-none outline-none font-medium text-[13px] leading-[1.6] placeholder:text-slate-400" 
+                                                placeholder="Enter Moloco plans for next month..."
+                                                value={narratives['MOLOCO_plan'] || ""}
+                                                onChange={e => setNarratives({...narratives, 'MOLOCO_plan': e.target.value})}
+                                            />
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        )}
+
+                        {/* Slide 3.7: TTD Overview */}
+                        {reportData && ttdGlobalStats && (
+                            <div className="slide-container">
+                                <div className="flex justify-between items-start mb-4 w-full gap-3">
+                                    <div className="bg-wise-fast text-wise-forest font-black uppercase rounded-r-full flex flex-col justify-center -ml-[0.5cm] pl-[0.5cm] pr-10 py-2" style={{ fontSize: '2rem', lineHeight: '1.1' }}>
+                                        <span className="tracking-tighter">THE TRADE DESK</span>
+                                        <span className="tracking-tighter">PERFORMANCE</span>
+                                    </div>
+                                    
+                                    <div className="flex gap-2 flex-1 justify-end">
+                                        <MetricCard title="Spend" val={fmtCompactCurr(ttdGlobalStats.spend)} mom={ttdGlobalStats.shifts?.mom?.spend} yoy={ttdGlobalStats.shifts?.yoy?.spend} inverse={false} rawVal={ttdGlobalStats.spend} />
+                                        <MetricCard title="MNCs" val={fmtCompactNum(ttdGlobalStats.mncs)} mom={ttdGlobalStats.shifts?.mom?.mncs} yoy={ttdGlobalStats.shifts?.yoy?.mncs} inverse={false} rawVal={ttdGlobalStats.mncs} />
+                                        <MetricCard title="LTV" val={`£${ttdGlobalStats.ltv.toFixed(2)}`} mom={ttdGlobalStats.shifts?.mom?.ltv} yoy={ttdGlobalStats.shifts?.yoy?.ltv} inverse={false} rawVal={ttdGlobalStats.ltv} />
+                                        <MetricCard title="CPA" val={`£${ttdGlobalStats.cpa.toFixed(0)}`} mom={ttdGlobalStats.shifts?.mom?.cpa} yoy={ttdGlobalStats.shifts?.yoy?.cpa} inverse={true} rawVal={ttdGlobalStats.cpa} />
+                                        <MetricCard title="Payback" val={ttdGlobalStats.payback.toFixed(1) + 'm'} mom={ttdGlobalStats.shifts?.mom?.payback} yoy={ttdGlobalStats.shifts?.yoy?.payback} inverse={true} rawVal={ttdGlobalStats.payback} />
+                                    </div>
+                                </div>
+                                
+                                <div className="grid grid-cols-12 gap-4 flex-1 overflow-hidden min-h-0">
+                                    <div className="col-span-5 flex flex-col h-full">
+                                        <div className="flex-1 bg-slate-50 border-2 border-white rounded-[2rem] p-4 shadow-inner flex flex-col relative overflow-hidden min-h-0">
+                                            <h4 className="text-slate-400 text-[11px] font-black uppercase tracking-[0.3em] mb-2 flex items-center gap-2">
+                                                <Icons.Info size={16} /> Region Split
+                                            </h4>
+                                            <div className="flex-1 overflow-y-auto pr-2">
+                                                <table className="w-full text-[13px] font-bold border-collapse">
+                                                    <thead className="text-slate-400 uppercase tracking-widest border-b-2 border-slate-200 sticky top-0 bg-slate-50 z-10">
+                                                        <tr>
+                                                            <th className="py-1.5 px-2 text-left">Region</th>
+                                                            <th className="py-1.5 px-2 text-right">Spend</th>
+                                                            <th className="py-1.5 px-2 text-right">MNCs</th>
+                                                            <th className="py-1.5 px-2 text-right">LTV</th>
+                                                            <th className="py-1.5 px-2 text-right">CPA</th>
+                                                            <th className="py-1.5 px-2 text-right">PB</th>
+                                                        </tr>
+                                                    </thead>
+                                                    <tbody className="divide-y-2 divide-slate-100">
+                                                        {reportData.regions.map((reg, i) => {
+                                                            const p = reg.platformStats.find(platform => platform.name === 'TTD');
+                                                            if (!p || (p.mncs === 0 && p.spend === 0)) return null;
+                                                            return (
+                                                                <tr key={i} className="hover:bg-white transition-colors">
+                                                                    <td className="py-2 px-2 uppercase text-slate-700 font-black">{reg.name}</td>
+                                                                    <td className="py-2 px-2 text-right">
+                                                                        <div className="flex flex-col items-end gap-0.5">
+                                                                            <span className="font-black text-slate-900 text-[14px]">{fmtCompactCurr(p.spend)}</span>
+                                                                            {renderTablePct(p.shifts?.mom?.spend, 'spend', p.spend)}
+                                                                        </div>
+                                                                    </td>
+                                                                    <td className="py-2 px-2 text-right">
+                                                                        <div className="flex flex-col items-end gap-0.5">
+                                                                            <span className="font-black text-slate-900 text-[14px]">{p.mncs.toLocaleString()}</span>
+                                                                            {renderTablePct(p.shifts?.mom?.mncs, 'mncs', p.mncs)}
+                                                                        </div>
+                                                                    </td>
+                                                                    <td className="py-2 px-2 text-right">
+                                                                        <div className="flex flex-col items-end gap-0.5">
+                                                                            <span className="font-black text-slate-900 text-[14px]">£{p.ltv.toFixed(2)}</span>
+                                                                            {renderTablePct(p.shifts?.mom?.ltv, 'ltv', p.ltv)}
+                                                                        </div>
+                                                                    </td>
+                                                                    <td className="py-2 px-2 text-right">
+                                                                        <div className="flex flex-col items-end gap-0.5">
+                                                                            <span className="font-black text-slate-900 text-[14px]">£{p.cpa.toFixed(0)}</span>
+                                                                            {renderTablePct(p.shifts?.mom?.cpa, 'cpa', p.cpa)}
+                                                                        </div>
+                                                                    </td>
+                                                                    <td className="py-2 px-2 text-right">
+                                                                        <div className="flex flex-col items-end gap-0.5">
+                                                                            <span className="font-black text-slate-900 text-[14px]">{p.payback.toFixed(1)}m</span>
+                                                                            {renderTablePct(p.shifts?.mom?.payback, 'payback', p.payback)}
+                                                                        </div>
+                                                                    </td>
+                                                                </tr>
+                                                            );
+                                                        })}
+                                                    </tbody>
+                                                </table>
+                                            </div>
+                                            <div className="text-[10px] text-slate-400 font-semibold italic text-right px-2 mt-2">
+                                                * All percentage shifts indicate Month-over-Month (MoM) comparisons.
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <div className="col-span-7 flex flex-col gap-4 h-full">
+                                        <div className="flex-1 bg-wise-forest rounded-[2rem] p-6 shadow-2xl flex flex-col relative overflow-hidden h-full">
+                                            <div className="absolute -top-16 -right-16 p-12 opacity-5"><Icons.Zap size={300} className="text-white" /></div>
+                                            <h4 className="text-wise-fast text-[12px] font-black uppercase tracking-[0.4em] mb-4 flex items-center gap-2">
+                                                <Icons.Zap size={18} /> Performance
+                                            </h4>
+                                            <textarea 
+                                                className="bg-transparent text-white w-full h-full resize-none outline-none font-medium text-[14px] leading-[1.6] placeholder:text-white/20 relative z-10" 
+                                                placeholder="Enter The Trade Desk performance notes..."
+                                                value={narratives['TTD_perf'] !== undefined ? narratives['TTD_perf'] : defaultTTDPerfText} 
+                                                onChange={e => setNarratives({...narratives, 'TTD_perf': e.target.value})}
+                                            />
+                                        </div>
+                                        
+                                        <div className="flex-1 bg-slate-50 border-2 border-white rounded-[2rem] p-6 shadow-inner flex flex-col relative overflow-hidden h-full">
+                                            <h4 className="text-slate-400 text-[11px] font-black uppercase tracking-[0.3em] mb-3 flex items-center gap-2">
+                                                <Icons.Calendar size={18} /> Next Month's Plans
+                                            </h4>
+                                            <textarea 
+                                                className="bg-transparent text-slate-700 w-full h-full resize-none outline-none font-medium text-[13px] leading-[1.6] placeholder:text-slate-400" 
+                                                placeholder="Enter The Trade Desk plans for next month..."
+                                                value={narratives['TTD_plan'] || ""}
+                                                onChange={e => setNarratives({...narratives, 'TTD_plan': e.target.value})}
+                                            />
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        )}
+                        
+                        {/* Slide 4: Section Divider - Regional Performance */}
+                        <div className="slide-container bg-wise-fast overflow-hidden relative">
+                            <h1 className="text-wise-forest font-black uppercase tracking-tighter" style={{ fontSize: '8.5rem', lineHeight: '0.9' }}>
+                                REGIONAL<br/>PERFORMANCE
+                            </h1>
+                            <div className="absolute bottom-[0.5cm] left-[0.5cm]">
+                                <span className="text-wise-forest/60 font-black tracking-tighter" style={{ fontSize: '10rem', lineHeight: '1' }}>
+                                    02
+                                </span>
+                            </div>
+                        </div>
+
+                        {/* Regional Loop */}
+                        {reportData && reportData.regions.map((reg) => (
+                            <div className="slide-container" key={reg.name}>
+                                
+                                {/* Regional Header Section */}
+                                <div className="flex justify-between items-start mb-4 w-full gap-3">
+                                    <div className="bg-wise-fast text-wise-forest font-black uppercase rounded-r-full flex items-center -ml-[0.5cm] pl-[0.5cm] pr-10 py-2" style={{ fontSize: '3rem', lineHeight: '1' }}>
+                                        <span className="tracking-tighter">{reg.name}</span>
+                                    </div>
+                                    
+                                    <div className="flex gap-2 flex-1 justify-end">
+                                        <MetricCard title="Spend" val={fmtCompactCurr(reg.stats.spend)} mom={reg.shifts.mom.spend} yoy={reg.shifts.yoy.spend} inverse={false} rawVal={reg.stats.spend} />
+                                        <MetricCard title="MNCs" val={fmtCompactNum(reg.stats.mncs)} mom={reg.shifts.mom.mncs} yoy={reg.shifts.yoy.mncs} inverse={false} rawVal={reg.stats.mncs} />
+                                        <MetricCard title="LTV" val={`£${reg.stats.ltv.toFixed(2)}`} mom={reg.shifts.mom.ltv} yoy={reg.shifts.yoy.ltv} inverse={false} rawVal={reg.stats.ltv} />
+                                        <MetricCard title="CPA" val={`£${reg.stats.cpa.toFixed(0)}`} mom={reg.shifts.mom.cpa} yoy={reg.shifts.yoy.cpa} inverse={true} rawVal={reg.stats.cpa} />
+                                        <MetricCard title="Payback" val={reg.stats.payback.toFixed(1) + 'm'} mom={reg.shifts.mom.payback} yoy={reg.shifts.yoy.payback} inverse={true} rawVal={reg.stats.payback} />
+                                    </div>
+                                </div>
+                                
+                                <div className="grid grid-cols-12 gap-4 flex-1 overflow-hidden min-h-0">
+                                    
+                                    {/* Left Column: Platform Cards & Next Month Plans */}
+                                    <div className="col-span-8 flex flex-col gap-4 min-h-0">
+                                        
+                                        {/* Platform Cards Row */}
+                                        <div className="grid grid-cols-3 gap-4 h-auto shrink-0">
+                                            {reg.platformStats.filter(p => p.mncs > 0 || p.spend > 0).map(p => (
+                                                <div key={p.name} className="bg-white border-2 border-slate-50 rounded-[1.5rem] p-3 shadow-lg flex flex-col relative overflow-hidden group">
+                                                    
+                                                    {/* Header: Name & Payback */}
+                                                    <div className="flex justify-between items-center mb-2">
+                                                        <span className="text-[12px] font-black uppercase text-slate-500 tracking-widest">{p.name}</span>
+                                                        <span className="text-[10px] font-black text-indigo-700 bg-indigo-50 px-3 py-1 rounded-full border border-indigo-100">{p.payback.toFixed(1)}m</span>
+                                                    </div>
+                                                    
+                                                    {/* MNCs */}
+                                                    <div className="mb-1 flex justify-between items-start">
+                                                        <div className="flex items-baseline gap-1">
+                                                            <p className="text-[2.5rem] font-black text-slate-900 tracking-tighter leading-none">{p.mncs.toLocaleString()}</p>
+                                                            <p className="text-[9px] text-slate-400 font-bold uppercase tracking-widest">MNCs</p>
+                                                        </div>
+                                                        <div className="mt-1">
+                                                            {renderPlatformPct(p.shifts?.mom?.mncs, 'mncs', p.mncs)}
+                                                        </div>
+                                                    </div>
+                                                    
+                                                    {/* Trendline */}
+                                                    <div className="w-full h-8 mb-2 opacity-50 group-hover:opacity-100 transition-opacity">
+                                                        <MiniTrend data={p.trend.map(t => t.mncs)} height={32} color="#818cf8" />
+                                                    </div>
+                                                    
+                                                    {/* Spend */}
+                                                    <div className="mb-1.5 bg-slate-50 px-2 py-1.5 rounded-xl border border-slate-100 flex flex-col justify-center">
+                                                        <div className="flex justify-between items-start mb-0.5">
+                                                            <p className="text-[9px] text-slate-400 font-bold uppercase tracking-wider mt-0.5">Spend</p>
+                                                            {renderPlatformPct(p.shifts?.mom?.spend, 'spend', p.spend)}
+                                                        </div>
+                                                        <p className="text-lg font-black text-slate-900">{fmtCompactCurr(p.spend)}</p>
+                                                    </div>
+                                                    
+                                                    {/* LTV & CPA Row */}
+                                                    <div className="grid grid-cols-2 gap-1.5 mt-auto">
+                                                        <div className="bg-slate-50 px-2 py-1.5 rounded-xl border border-slate-100 flex flex-col justify-center">
+                                                            <div className="flex justify-between items-start mb-0.5">
+                                                                <p className="text-[9px] text-slate-400 font-bold uppercase tracking-wider mt-0.5">LTV</p>
+                                                                {renderPlatformPct(p.shifts?.mom?.ltv, 'ltv', p.ltv)}
+                                                            </div>
+                                                            <p className="text-sm font-black text-slate-900">£{p.ltv.toFixed(2)}</p>
+                                                        </div>
+                                                        <div className="bg-slate-50 px-2 py-1.5 rounded-xl border border-slate-100 flex flex-col justify-center">
+                                                            <div className="flex justify-between items-start mb-0.5">
+                                                                <p className="text-[9px] text-slate-400 font-bold uppercase tracking-wider mt-0.5">CPA</p>
+                                                                {renderPlatformPct(p.shifts?.mom?.cpa, 'cpa', p.cpa)}
+                                                            </div>
+                                                            <p className="text-sm font-black text-slate-900">£{p.cpa.toFixed(0)}</p>
+                                                        </div>
+                                                    </div>
+
+                                                </div>
+                                            ))}
+                                        </div>
+
+                                        {/* Note regarding MoM comparisons */}
+                                        <div className="text-[10px] text-slate-400 font-semibold italic text-right px-2 -mt-2">
+                                            * All percentage shifts indicate Month-over-Month (MoM) comparisons.
+                                        </div>
+
+                                        {/* Next Month's Plans Section */}
+                                        <div className="flex-1 bg-slate-50 border-2 border-white rounded-[1.5rem] p-4 shadow-inner flex flex-col relative overflow-hidden min-h-[100px]">
+                                            <h4 className="text-slate-400 text-[11px] font-black uppercase tracking-[0.3em] mb-2 flex items-center gap-2">
+                                                <Icons.Calendar size={18} /> Next Month's Plans
+                                            </h4>
+                                            <textarea 
+                                                className="bg-transparent text-slate-700 w-full h-full resize-none outline-none font-medium text-[14px] leading-relaxed placeholder:text-slate-400" 
+                                                placeholder="Enter plans for next month..."
+                                                value={narratives[reg.name + '_plan'] || ""}
+                                                onChange={e => setNarratives({...narratives, [reg.name + '_plan']: e.target.value})}
+                                            />
+                                        </div>
+
+                                    </div>
+                                    
+                                    {/* Right Column: Performance Notes */}
+                                    <div className="col-span-4 flex flex-col h-full">
+                                        <div className="flex-1 bg-wise-forest rounded-[1.5rem] p-5 shadow-2xl flex flex-col h-full">
+                                            <h4 className="text-wise-fast text-[12px] font-black uppercase tracking-[0.4em] mb-4 flex items-center gap-2">
+                                                <Icons.Zap size={18} /> Performance
+                                            </h4>
+                                            <textarea 
+                                                className="bg-transparent text-white w-full h-full resize-none outline-none font-medium text-[14px] leading-[1.7] placeholder:text-white/20" 
+                                                placeholder="Enter performance notes..."
+                                                value={narratives[reg.name + '_perf'] !== undefined ? narratives[reg.name + '_perf'] : `${getMoName(selectedMonth)} concluded in ${reg.name} with ${reg.stats.mncs.toLocaleString()} MNCs (${reg.shifts.mom.mncs > 0 ? '+' : ''}${(reg.shifts.mom.mncs * 100).toFixed(1)}% MoM) at a ${reg.stats.payback.toFixed(1)}-month payback.\n\n${reg.platformStats.filter(p => p.mncs > 0).map(p => `${p.name} drove ${p.mncs.toLocaleString()} MNCs at a ${p.payback.toFixed(1)}-month payback with an LTV of £${p.ltv.toFixed(2)}.`).join('\n\n')}`}
+                                                onChange={e => setNarratives({...narratives, [reg.name + '_perf']: e.target.value})}
+                                            />
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        ))}
+
+                        {/* Slide : Section Divider - Updates */}
+                        <div className="slide-container bg-wise-fast overflow-hidden relative">
+                            <h1 className="text-wise-forest font-black uppercase tracking-tighter" style={{ fontSize: '8.5rem', lineHeight: '0.9' }}>
+                                PAID DISPLAY<br/>UPDATES
+                            </h1>
+                            <div className="absolute bottom-[0.5cm] left-[0.5cm]">
+                                <span className="text-wise-forest/60 font-black tracking-tighter" style={{ fontSize: '10rem', lineHeight: '1' }}>
+                                    03
+                                </span>
+                            </div>
+                        </div>
+
+                        {/* Slide : Team Updates & Upcoming Plans */}
+                        <div className="slide-container bg-slate-100 overflow-hidden relative flex flex-col justify-center items-center">
+                            <div className="flex gap-12 w-full h-full max-w-[1200px] py-8">
+                                {/* Card 1 */}
+                                <div className="bg-white rounded-[3rem] p-8 flex-1 shadow-xl flex flex-col items-center text-center border border-slate-200">
+                                    <div className="w-32 h-32 bg-slate-50 rounded-[2rem] border border-slate-200 mb-8 flex items-center justify-center text-[4rem] shadow-sm">
+                                        🎉
+                                    </div>
+                                    <h2 className="text-[2.5rem] font-black text-wise-forest tracking-tighter mb-8">Team Updates</h2>
+                                    <textarea 
+                                        className="w-full flex-1 resize-none outline-none text-slate-600 text-lg leading-[1.8] text-left font-medium placeholder:text-slate-300"
+                                        placeholder="Enter team updates..."
+                                        value={narratives['team_updates'] !== undefined ? narratives['team_updates'] : "• Cristina has joined in the London Office as a Paid Display Manager!\n\n• Li is off for a well-deserved Sabbatical."}
+                                        onChange={e => setNarratives({...narratives, 'team_updates': e.target.value})}
+                                    />
+                                </div>
+                                
+                                {/* Card 2 */}
+                                <div className="bg-white rounded-[3rem] p-8 flex-1 shadow-xl flex flex-col items-center text-center border border-slate-200">
+                                    <div className="w-32 h-32 bg-slate-50 rounded-[2rem] border border-slate-200 mb-8 flex items-center justify-center text-[4rem] shadow-sm">
+                                        📅
+                                    </div>
+                                    <h2 className="text-[2.5rem] font-black text-wise-forest tracking-tighter mb-8">Upcoming Plans</h2>
+                                    <textarea 
+                                        className="w-full flex-1 resize-none outline-none text-slate-600 text-lg leading-[1.8] text-left font-medium placeholder:text-slate-300"
+                                        placeholder="Enter upcoming plans..."
+                                        value={narratives['upcoming_plans'] !== undefined ? narratives['upcoming_plans'] : "• Android Test on Moloco.\n\n• Launch of Amazon DSP activity.\n\n• Visa World Cup Campaign."}
+                                        onChange={e => setNarratives({...narratives, 'upcoming_plans': e.target.value})}
+                                    />
+                                </div>
+                            </div>
+                        </div>
+
+                        {/* Analysis End Slide */}
+                        <div className="slide-container bg-wise-forest overflow-hidden relative">
+                            <div className="relative z-10 w-full h-full flex flex-col justify-start">
+                                <h1 className="text-wise-fast font-black uppercase tracking-tighter" style={{ fontSize: '8.5rem', lineHeight: '0.9' }}>
+                                    THANK<br/>YOU
+                                </h1>
+                            </div>
+                        </div>
                     </div>
                 </div>
             );
         }
+
         const root = ReactDOM.createRoot(document.getElementById('root'));
         root.render(<App />);
     </script>
