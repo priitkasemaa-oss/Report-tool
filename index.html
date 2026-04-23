@@ -69,6 +69,10 @@
                 border-radius: 0 !important;
                 padding: 0.5cm !important; /* Exactly 0.5cm margin for PDF export */
             }
+            .slide-container:last-child {
+                page-break-after: auto !important;
+                break-after: auto !important;
+            }
             
             /* Fix for PDF shadow artifacts causing grey boxes */
             * {
@@ -492,7 +496,7 @@
                         return `${r.name} Performance Details: ${narratives[r.name+'_perf'] || 'N/A'}\n${r.name} Upcoming Plans: ${narratives[r.name+'_plan'] || 'N/A'}`;
                     }).join('\n\n---\n\n');
 
-                    const systemPrompt = "You are a professional senior marketing analyst at Wise. You are summarizing paid display performance across multiple regions for the monthly reporting cycle.";
+                    const systemPrompt = "You are a professional senior marketing analyst at Wise. You are summarizing Paid Display performance across multiple regions for the monthly reporting cycle. Always capitalize 'Paid Display' (never 'paid display').";
 
                     const prompt = `Based on the following regional overviews for ${getMoName(selectedMonth)}, generate a global summary.
 
@@ -500,7 +504,7 @@ Input Data (Regional Summaries & Plans):
 ${regContext}
 
 Instructions:
-1. Provide a global summary for Global Paid Display (GLOBAL_perf) and the three main platforms: Google AC (GAC_perf), Moloco (MOLOCO_perf), and The Trade Desk (TTD_perf).
+1. Provide a global summary for Global Paid Display (GLOBAL_perf) and the three main platforms: Google AC (GAC_perf), Moloco (MOLOCO_perf), and The Trade Desk (TTD_perf). Ensure any mention of "paid display" is capitalized as "Paid Display".
 2. For "GLOBAL_perf", provide 2-3 sentences summarizing the biggest global trends (e.g., specific market wins, creative performance, or tech shifts) derived from regional input.
 3. For "GLOBAL_plan", provide a summarized bulleted list of the top 3-5 highest-priority upcoming initiatives globally. IMPORTANT: Separate each bullet point with two newlines (\\n\\n) so they are not side-by-side.
 4. For platform performance (GAC_perf, MOLOCO_perf, TTD_perf), provide 2-3 sentences summarizing their specific performance story based on regional details.
