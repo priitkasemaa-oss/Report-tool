@@ -79,6 +79,13 @@
             textarea {
                 overflow: hidden !important;
                 resize: none !important;
+                font-size: 11px !important;
+                line-height: 1.4 !important;
+            }
+            
+            textarea[class*="text-lg"] {
+                font-size: 14px !important;
+                line-height: 1.6 !important;
             }
         }
 
@@ -495,20 +502,20 @@ ${regContext}
 Instructions:
 1. Provide a global summary for Global Paid Display (GLOBAL_perf) and the three main platforms: Google AC (GAC_perf), Moloco (MOLOCO_perf), and The Trade Desk (TTD_perf).
 2. For "GLOBAL_perf", provide 2-3 sentences summarizing the biggest global trends (e.g., specific market wins, creative performance, or tech shifts) derived from regional input.
-3. For "GLOBAL_plan", provide a summarized bulleted list of the top 3-5 highest-priority upcoming initiatives globally.
+3. For "GLOBAL_plan", provide a summarized bulleted list of the top 3-5 highest-priority upcoming initiatives globally. IMPORTANT: Separate each bullet point with two newlines (\\n\\n) so they are not side-by-side.
 4. For platform performance (GAC_perf, MOLOCO_perf, TTD_perf), provide 2-3 sentences summarizing their specific performance story based on regional details.
-5. For platform plans (GAC_plan, MOLOCO_plan, TTD_plan), provide 2-3 key upcoming initiatives specific to that channel.
+5. For platform plans (GAC_plan, MOLOCO_plan, TTD_plan), provide 2-3 key upcoming initiatives specific to that channel. IMPORTANT: Separate each bullet point with two newlines (\\n\\n) so they are not side-by-side.
 
 Output as a JSON object with these EXACT keys:
 {
   "GLOBAL_perf": "text string",
-  "GLOBAL_plan": "bulleted string starting with •",
+  "GLOBAL_plan": "bulleted string starting with • (separate each bullet with \\n\\n)",
   "GAC_perf": "text string",
-  "GAC_plan": "bulleted string starting with •",
+  "GAC_plan": "bulleted string starting with • (separate each bullet with \\n\\n)",
   "MOLOCO_perf": "text string",
-  "MOLOCO_plan": "bulleted string starting with •",
+  "MOLOCO_plan": "bulleted string starting with • (separate each bullet with \\n\\n)",
   "TTD_perf": "text string",
-  "TTD_plan": "bulleted string starting with •"
+  "TTD_plan": "bulleted string starting with • (separate each bullet with \\n\\n)"
 }`;
                     
                     const res = await fetch("https://api.openai.com/v1/chat/completions", { 
@@ -1277,5 +1284,4 @@ Output as a JSON object with these EXACT keys:
     </script>
 </body>
 </html>
-
 
