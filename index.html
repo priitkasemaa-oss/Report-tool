@@ -54,13 +54,13 @@
         }
 
         @media print {
-            @page { size: landscape; margin: 0; }
+            @page { size: 1280px 720px; margin: 0; }
             body { background: white !important; padding: 0 !important; margin: 0 !important; }
             .no-print { display: none !important; }
             .slide-container {
                 margin: 0 !important;
-                width: 100vw !important;
-                height: 100vh !important;
+                width: 1280px !important;
+                height: 720px !important;
                 max-width: none !important;
                 page-break-after: always !important;
                 break-after: page !important;
@@ -68,6 +68,17 @@
                 border: none !important;
                 border-radius: 0 !important;
                 padding: 0.5cm !important; /* Exactly 0.5cm margin for PDF export */
+            }
+            
+            /* Fix for PDF shadow artifacts causing grey boxes */
+            * {
+                box-shadow: none !important;
+            }
+            
+            /* Clean up textareas for PDF export */
+            textarea {
+                overflow: hidden !important;
+                resize: none !important;
             }
         }
 
@@ -395,7 +406,7 @@
                         };
                     });
 
-                    // --- TABLE GROUPING LOGIC (Using NoAvow data so it stays hidden) ---
+                    // --- TABLE GROUPING LOGIC ---
                     const breakDownRecords = curMatchNoAvow;
                     let dimKey = isGlobal ? 'region' : 'country';
                     if (!isGlobal && breakDownRecords.every(d => !d.country || d.country === regionName)) {
@@ -454,41 +465,84 @@
                 return { global: buildRegionalData('GLOBAL'), regions: REGIONS.map(r => buildRegionalData(r)).filter(r => r.stats.mncs > 0 || r.stats.spend > 0) };
             }, [rawData, selectedMonth, headers]);
 
-            // Default Text Generators
+            const gacGlobalStats = reportData?.global?.platformStats?.find(p => p.name === 'Google AC');
+            const molocoGlobalStats = reportData?.global?.platformStats?.find(p => p.name === 'Moloco');
+            const ttdGlobalStats = reportData?.global?.platformStats?.find(p => p.name === 'TTD');
+
             const defaultGlobalPerfText = reportData ? `In ${getMoName(selectedMonth)}, we drove ${reportData.global.stats.mncs.toLocaleString()} MNCs (${reportData.global.shifts.mom.mncs > 0 ? '+' : ''}${(reportData.global.shifts.mom.mncs * 100).toFixed(1)}% MoM) with a total spend of ${fmtCompactCurr(reportData.global.stats.spend)} (${reportData.global.shifts.mom.spend > 0 ? '+' : ''}${(reportData.global.shifts.mom.spend * 100).toFixed(1)}% MoM). This resulted in a payback of ${reportData.global.stats.payback.toFixed(1)}m (${reportData.global.shifts.mom.payback > 0 ? '+' : ''}${(reportData.global.shifts.mom.payback * 100).toFixed(1)}% MoM).` : "";
             
-            const gacGlobalStats = reportData?.global?.platformStats?.find(p => p.name === 'Google AC');
             const defaultGACPerfText = gacGlobalStats ? `In ${getMoName(selectedMonth)}, Google App Campaigns drove ${gacGlobalStats.mncs.toLocaleString()} MNCs (${gacGlobalStats.shifts.mom.mncs > 0 ? '+' : ''}${(gacGlobalStats.shifts.mom.mncs * 100).toFixed(1)}% MoM) with a total spend of ${fmtCompactCurr(gacGlobalStats.spend)} (${gacGlobalStats.shifts.mom.spend > 0 ? '+' : ''}${(gacGlobalStats.shifts.mom.spend * 100).toFixed(1)}% MoM). This resulted in a payback of ${gacGlobalStats.payback.toFixed(1)}m (${gacGlobalStats.shifts.mom.payback > 0 ? '+' : ''}${(gacGlobalStats.shifts.mom.payback * 100).toFixed(1)}% MoM).` : "";
 
-            const molocoGlobalStats = reportData?.global?.platformStats?.find(p => p.name === 'Moloco');
             const defaultMolocoPerfText = molocoGlobalStats ? `In ${getMoName(selectedMonth)}, Moloco drove ${molocoGlobalStats.mncs.toLocaleString()} MNCs (${molocoGlobalStats.shifts.mom.mncs > 0 ? '+' : ''}${(molocoGlobalStats.shifts.mom.mncs * 100).toFixed(1)}% MoM) with a total spend of ${fmtCompactCurr(molocoGlobalStats.spend)} (${molocoGlobalStats.shifts.mom.spend > 0 ? '+' : ''}${(molocoGlobalStats.shifts.mom.spend * 100).toFixed(1)}% MoM). This resulted in a payback of ${molocoGlobalStats.payback.toFixed(1)}m (${molocoGlobalStats.shifts.mom.payback > 0 ? '+' : ''}${(molocoGlobalStats.shifts.mom.payback * 100).toFixed(1)}% MoM).` : "";
 
-            const ttdGlobalStats = reportData?.global?.platformStats?.find(p => p.name === 'TTD');
             const defaultTTDPerfText = ttdGlobalStats ? `In ${getMoName(selectedMonth)}, The Trade Desk drove ${ttdGlobalStats.mncs.toLocaleString()} MNCs (${ttdGlobalStats.shifts.mom.mncs > 0 ? '+' : ''}${(ttdGlobalStats.shifts.mom.mncs * 100).toFixed(1)}% MoM) with a total spend of ${fmtCompactCurr(ttdGlobalStats.spend)} (${ttdGlobalStats.shifts.mom.spend > 0 ? '+' : ''}${(ttdGlobalStats.shifts.mom.spend * 100).toFixed(1)}% MoM). This resulted in a payback of ${ttdGlobalStats.payback.toFixed(1)}m (${ttdGlobalStats.shifts.mom.payback > 0 ? '+' : ''}${(ttdGlobalStats.shifts.mom.payback * 100).toFixed(1)}% MoM).` : "";
 
             const runAISync = async () => {
                 if (!apiKey || !reportData) return;
                 setIsSyncing(true);
                 try {
-                    const regContext = reportData.regions.map(r => `${r.name} Perf: ${narratives[r.name+'_perf']||''} | ${r.name} Plan: ${narratives[r.name+'_plan']||''}`).join('\n');
-                    const prompt = `As a marketing analyst, summarize these regional updates for ${selectedMonth} into a global view.\n\nInput Regional Data:\n${regContext}\n\nOutput a JSON object with 8 keys:\n1. "GLOBAL_perf_insights": A short, high-level summary of the most important performance drivers across all regions (do NOT list every region individually).\n2. "GLOBAL_plan": A bulleted list summarizing the most important, high-priority upcoming plans globally based on the regional plans.\n3. "GAC_perf_insights": A short summary focusing specifically on Google App Campaigns (GAC) global performance based on the regional notes.\n4. "GAC_plan": A bulleted list of upcoming plans specifically related to Google App Campaigns.\n5. "MOLOCO_perf_insights": A short summary focusing specifically on Moloco global performance based on the regional notes.\n6. "MOLOCO_plan": A bulleted list of upcoming plans specifically related to Moloco.\n7. "TTD_perf_insights": A short summary focusing specifically on The Trade Desk (TTD) global performance based on the regional notes.\n8. "TTD_plan": A bulleted list of upcoming plans specifically related to The Trade Desk.`;
+                    const regContext = reportData.regions.map(r => {
+                        return `${r.name} Performance Details: ${narratives[r.name+'_perf'] || 'N/A'}\n${r.name} Upcoming Plans: ${narratives[r.name+'_plan'] || 'N/A'}`;
+                    }).join('\n\n---\n\n');
+
+                    const systemPrompt = "You are a professional senior marketing analyst at Wise. You are summarizing paid display performance across multiple regions for the monthly reporting cycle.";
+
+                    const prompt = `Based on the following regional overviews for ${getMoName(selectedMonth)}, generate a global summary.
+
+Input Data (Regional Summaries & Plans):
+${regContext}
+
+Instructions:
+1. Provide a global summary for Global Paid Display (GLOBAL_perf) and the three main platforms: Google AC (GAC_perf), Moloco (MOLOCO_perf), and The Trade Desk (TTD_perf).
+2. For "GLOBAL_perf", provide 2-3 sentences summarizing the biggest global trends (e.g., specific market wins, creative performance, or tech shifts) derived from regional input.
+3. For "GLOBAL_plan", provide a summarized bulleted list of the top 3-5 highest-priority upcoming initiatives globally.
+4. For platform performance (GAC_perf, MOLOCO_perf, TTD_perf), provide 2-3 sentences summarizing their specific performance story based on regional details.
+5. For platform plans (GAC_plan, MOLOCO_plan, TTD_plan), provide 2-3 key upcoming initiatives specific to that channel.
+
+Output as a JSON object with these EXACT keys:
+{
+  "GLOBAL_perf": "text string",
+  "GLOBAL_plan": "bulleted string starting with •",
+  "GAC_perf": "text string",
+  "GAC_plan": "bulleted string starting with •",
+  "MOLOCO_perf": "text string",
+  "MOLOCO_plan": "bulleted string starting with •",
+  "TTD_perf": "text string",
+  "TTD_plan": "bulleted string starting with •"
+}`;
                     
-                    const res = await fetch("https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-09-2025:generateContent?key=" + apiKey, { method: 'POST', body: JSON.stringify({ contents: [{ parts: [{ text: prompt }] }] }) });
+                    const res = await fetch("https://api.openai.com/v1/chat/completions", { 
+                        method: 'POST', 
+                        headers: {
+                            'Content-Type': 'application/json',
+                            'Authorization': `Bearer ${apiKey}`
+                        },
+                        body: JSON.stringify({ 
+                            model: "gpt-4o",
+                            messages: [
+                                { role: "system", content: systemPrompt },
+                                { role: "user", content: prompt }
+                            ],
+                            response_format: { type: "json_object" }
+                        }) 
+                    });
+
+                    if (!res.ok) throw new Error("API call failed");
+
                     const json = await res.json();
-                    const aiResult = JSON.parse((json.candidates?.[0]?.content?.parts?.[0]?.text || "{}").replace(/```json|```/g, ''));
+                    const aiResult = JSON.parse(json.choices[0].message.content);
                     
-                    setNarratives(prev => ({
-                        ...prev,
-                        'GLOBAL_perf': defaultGlobalPerfText + "\n\n" + (aiResult.GLOBAL_perf_insights || ""),
-                        'GLOBAL_plan': aiResult.GLOBAL_plan || prev['GLOBAL_plan'],
-                        'GAC_perf': defaultGACPerfText + "\n\n" + (aiResult.GAC_perf_insights || ""),
-                        'GAC_plan': aiResult.GAC_plan || prev['GAC_plan'],
-                        'MOLOCO_perf': defaultMolocoPerfText + "\n\n" + (aiResult.MOLOCO_perf_insights || ""),
-                        'MOLOCO_plan': aiResult.MOLOCO_plan || prev['MOLOCO_plan'],
-                        'TTD_perf': defaultTTDPerfText + "\n\n" + (aiResult.TTD_perf_insights || ""),
-                        'TTD_plan': aiResult.TTD_plan || prev['TTD_plan']
-                    }));
-                } catch (e) { console.error(e); } finally { setIsSyncing(false); }
+                    if (aiResult.GLOBAL_perf) aiResult.GLOBAL_perf = defaultGlobalPerfText + "\n\n" + aiResult.GLOBAL_perf;
+                    if (aiResult.GAC_perf) aiResult.GAC_perf = defaultGACPerfText + "\n\n" + aiResult.GAC_perf;
+                    if (aiResult.MOLOCO_perf) aiResult.MOLOCO_perf = defaultMolocoPerfText + "\n\n" + aiResult.MOLOCO_perf;
+                    if (aiResult.TTD_perf) aiResult.TTD_perf = defaultTTDPerfText + "\n\n" + aiResult.TTD_perf;
+
+                    setNarratives(prev => ({...prev, ...aiResult}));
+                } catch (e) { 
+                    console.error(e); 
+                } finally { 
+                    setIsSyncing(false); 
+                }
             };
 
             if (!rawData.length) {
@@ -524,7 +578,7 @@
                             <select value={selectedMonth} onChange={e => setSelectedMonth(e.target.value)} className="bg-white/10 border border-white/20 text-white font-bold text-xs px-6 py-3 rounded-2xl outline-none">
                                 {[...new Set(rawData.map(d => d.date))].sort().reverse().map(d => <option key={d} value={d} className="text-black">{d}</option>)}
                             </select>
-                            <input type="password" placeholder="Gemini Key" value={apiKey} onChange={e => setApiKey(e.target.value)} className="bg-white/10 border border-white/20 text-white text-xs px-6 py-3 rounded-2xl outline-none w-32 focus:w-64 transition-all" />
+                            <input type="password" placeholder="OpenAI Key" value={apiKey} onChange={e => setApiKey(e.target.value)} className="bg-white/10 border border-white/20 text-white text-xs px-6 py-3 rounded-2xl outline-none w-32 focus:w-64 transition-all" />
                             <button onClick={runAISync} disabled={isSyncing} className="bg-indigo-600 text-white px-8 py-3 rounded-2xl font-black text-xs uppercase hover:bg-indigo-500 flex items-center gap-3 shadow-lg active:scale-95 transition-transform">
                                 {isSyncing ? <Icons.Loader size={16} /> : <Icons.Zap size={16} />} Sync
                             </button>
@@ -622,7 +676,7 @@
                                                                     <div className="flex flex-col items-end gap-0.5">
                                                                         <span className="font-black text-slate-900 text-[14px]">£{p.ltv.toFixed(2)}</span>
                                                                         {renderTablePct(p.shifts?.mom?.ltv, 'ltv', p.ltv)}
-                                                                    </div>
+                                                                </div>
                                                                 </td>
                                                             ))}
                                                         </tr>
@@ -745,7 +799,7 @@
                                                                         <div className="flex flex-col items-end gap-0.5">
                                                                             <span className="font-black text-slate-900 text-[14px]">£{p.ltv.toFixed(2)}</span>
                                                                             {renderTablePct(p.shifts?.mom?.ltv, 'ltv', p.ltv)}
-                                                                    </div>
+                                                                        </div>
                                                                     </td>
                                                                     <td className="py-2 px-2 text-right">
                                                                         <div className="flex flex-col items-end gap-0.5">
@@ -859,7 +913,7 @@
                                                                         <div className="flex flex-col items-end gap-0.5">
                                                                             <span className="font-black text-slate-900 text-[14px]">£{p.ltv.toFixed(2)}</span>
                                                                             {renderTablePct(p.shifts?.mom?.ltv, 'ltv', p.ltv)}
-                                                                    </div>
+                                                                        </div>
                                                                     </td>
                                                                     <td className="py-2 px-2 text-right">
                                                                         <div className="flex flex-col items-end gap-0.5">
@@ -973,7 +1027,7 @@
                                                                         <div className="flex flex-col items-end gap-0.5">
                                                                             <span className="font-black text-slate-900 text-[14px]">£{p.ltv.toFixed(2)}</span>
                                                                             {renderTablePct(p.shifts?.mom?.ltv, 'ltv', p.ltv)}
-                                                                    </div>
+                                                                        </div>
                                                                     </td>
                                                                     <td className="py-2 px-2 text-right">
                                                                         <div className="flex flex-col items-end gap-0.5">
@@ -1223,5 +1277,5 @@
     </script>
 </body>
 </html>
-```
+
 
