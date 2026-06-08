@@ -333,7 +333,7 @@
                             if (clean.includes('payback')) return 'payback';
                             if (clean.includes('ltv')) return 'ltv';
                             if (clean.includes('regs') || clean.includes('regist')) return 'regs';
-                            if (clean === 'cm' || clean.includes('internalmeasurescm') || clean.includes('interanlmeasurescm') || clean.includes('contributionmargin')) return 'cm';
+                            if (clean === 'cm' || clean.includes('internalmeasurescm') || clean.includes('interanlmeasurescm') || clean.includes('contributionmargin') || clean.endsWith('cm') || clean.includes('masterreportcm')) return 'cm';
                             return clean;
                         });
                         setHeaders(mappedHeaders);
@@ -757,7 +757,7 @@ Output as a JSON object with these EXACT keys:
                                                                     <div className="flex flex-col items-end gap-0.5">
                                                                         <span className="font-black text-slate-900 text-[12px]">£{p.ltv.toFixed(2)}</span>
                                                                         {renderTablePct(p.shifts?.mom?.ltv, 'ltv', p.ltv)}
-                                                                </div>
+                                                                    </div>
                                                                 </td>
                                                             ))}
                                                         </tr>
