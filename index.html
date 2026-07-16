@@ -754,7 +754,7 @@ CAN,tradedesk,2025-09,80,38.00,2400,200</textarea>
 	                        <div class="p-6 border-b border-slate-100 bg-gradient-to-r from-indigo-50 to-white flex flex-col md:flex-row md:items-center md:justify-between gap-4">
 	                            <div>
 	                                <h3 class="text-2xl font-bold text-slate-900">High Value Customers</h3>
-	                                <p class="text-sm text-slate-500 mt-1">Country and vendor split for HVC_30d, pHVC_30d, and observed-to-predicted ratio.</p>
+	                                <p class="text-sm text-slate-500 mt-1">Country, vendor, and strategy/ad group split for HVC_30d, pHVC_30d, and observed-to-predicted ratio.</p>
 	                            </div>
 	                            <div class="relative w-full md:w-56">
 	                                <label class="absolute -top-2 left-2 bg-white px-1 text-xs font-semibold text-indigo-600">Time Frame</label>
@@ -768,7 +768,7 @@ CAN,tradedesk,2025-09,80,38.00,2400,200</textarea>
 	                            </div>
 	                        </div>
                         <div id="hvcContent" class="p-6 space-y-6">
-                            <div class="text-center py-10 text-slate-500">Upload data with HVC_30d and pHVC_30d columns to populate this view.</div>
+                            <div class="text-center py-10 text-slate-500">Upload data with HVC_30d, pHVC_30d, and Adset Name columns to populate this view.</div>
                         </div>
                     </div>
                 </div>
@@ -1096,6 +1096,14 @@ CAN,tradedesk,2025-09,80,38.00,2400,200</textarea>
                 'internal measures internal registrations': 'Registrations',
 	                'internal registrations': 'Registrations',
 	                'registrations': 'Registrations',
+	                'adset name': 'AdsetName',
+	                'ad set name': 'AdsetName',
+	                'ad group': 'AdsetName',
+	                'ad group name': 'AdsetName',
+	                'adgroup': 'AdsetName',
+	                'adgroup name': 'AdsetName',
+	                'strategy': 'AdsetName',
+	                'strategy name': 'AdsetName',
 	                'hvc_30d': 'HVC30d',
 	                'phvc_30d': 'pHVC30d',
 	                'date': 'Date',
@@ -1129,6 +1137,7 @@ CAN,tradedesk,2025-09,80,38.00,2400,200</textarea>
 
                 entry.Country = cleanStr(row.Country);
                 entry.Vendor = cleanStr(row.Vendor) || 'Unknown';
+	                entry.AdsetName = cleanStr(row.AdsetName) || 'Unspecified strategy';
                 entry.Month = cleanStr(row.Month);
                 
                 let foundDate = null;
@@ -1452,14 +1461,15 @@ CAN,tradedesk,2025-09,80,38.00,2400,200</textarea>
 	            }
 
 	            if (q.includes('hvc')) {
-	                const groupBy = q.includes('vendor') ? r => r.Vendor : q.includes('region') ? r => getRegionLabel(getRegionForCountry(r.Country)) : r => r.Country;
+	                const wantsStrategy = q.includes('strategy') || q.includes('ad group') || q.includes('adgroup') || q.includes('ad set') || q.includes('adset');
+	                const groupBy = wantsStrategy ? r => r.AdsetName : q.includes('vendor') ? r => r.Vendor : q.includes('region') ? r => getRegionLabel(getRegionForCountry(r.Country)) : r => r.Country;
 	                const ranked = groupHVC(rows, groupBy)
 	                    .filter(item => item.hvc > 0 || item.phvc > 0)
 	                    .sort((a, b) => b.hvc - a.hvc || b.phvc - a.phvc)
 	                    .slice(0, 8);
 	                const totals = aggregateHVC(rows);
 	                return ranked.length
-	                    ? `## HVC drivers\nTotal HVC_30d is **${formatNumber(totals.hvc)}** and total pHVC_30d is **${formatNumber(totals.phvc)}** (${formatHVCRatio(totals.hvc, totals.phvc)} HVC / pHVC).\n${ranked.map(item => `* **${item.key}:** ${formatNumber(item.hvc)} HVC_30d, ${formatNumber(item.phvc)} pHVC_30d, ${formatHVCRatio(item.hvc, item.phvc)} ratio.`).join('\n')}`
+	                    ? `## HVC drivers${wantsStrategy ? ' by strategy / ad group' : ''}\nTotal HVC_30d is **${formatNumber(totals.hvc)}** and total pHVC_30d is **${formatNumber(totals.phvc)}** (${formatHVCRatio(totals.hvc, totals.phvc)} HVC / pHVC).\n${ranked.map(item => `* **${item.key}:** ${formatNumber(item.hvc)} HVC_30d, ${formatNumber(item.phvc)} pHVC_30d, ${formatHVCRatio(item.hvc, item.phvc)} ratio.`).join('\n')}`
 	                    : 'I found matching rows, but no HVC_30d or pHVC_30d values for that scope.';
 	            }
 
@@ -2150,6 +2160,60 @@ CAN,tradedesk,2025-09,80,38.00,2400,200</textarea>
 	            `;
 	        }
 
+	        function summarizeHVCContext(rows, field) {
+	            const counts = {};
+	            rows.forEach(row => {
+	                const key = row[field] || 'Unknown';
+	                counts[key] = (counts[key] || 0) + ((Number(row.HVC30d) || 0) + (Number(row.pHVC30d) || 0));
+	            });
+	            return Object.entries(counts)
+	                .sort((a, b) => b[1] - a[1])
+	                .slice(0, 3)
+	                .map(([key]) => key)
+	                .join(', ');
+	        }
+
+	        function renderHVCStrategyTable(rows, totalHVC) {
+	            if (!rows.length) {
+	                return `<div class="text-center py-8 text-slate-500 bg-slate-50 rounded-lg border border-slate-100">No strategy or ad group rows available for this selection.</div>`;
+	            }
+
+	            return `
+	                <div class="overflow-x-auto custom-scrollbar">
+	                    <table class="min-w-full divide-y divide-slate-200">
+	                        <thead class="bg-slate-50">
+	                            <tr>
+	                                <th class="px-4 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider">Strategy / Ad Group</th>
+	                                <th class="px-4 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider">Top Countries</th>
+	                                <th class="px-4 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider">Top Vendors</th>
+	                                <th class="px-4 py-3 text-right text-xs font-medium text-slate-500 uppercase tracking-wider">HVC_30d</th>
+	                                <th class="px-4 py-3 text-right text-xs font-medium text-slate-500 uppercase tracking-wider">pHVC_30d</th>
+	                                <th class="px-4 py-3 text-right text-xs font-medium text-slate-500 uppercase tracking-wider">HVC / pHVC</th>
+	                                <th class="px-4 py-3 text-right text-xs font-medium text-slate-500 uppercase tracking-wider">HVC Share</th>
+	                            </tr>
+	                        </thead>
+	                        <tbody class="bg-white divide-y divide-slate-200">
+	                            ${rows.map(row => {
+	                                const share = totalHVC > 0 ? (row.hvc / totalHVC) * 100 : 0;
+	                                const ratio = row.phvc > 0 ? row.hvc / row.phvc : 0;
+	                                const ratioClass = row.phvc === 0 ? 'text-slate-400' : ratio >= 1 ? 'text-emerald-700 font-bold' : ratio >= 0.5 ? 'text-amber-700 font-bold' : 'text-rose-700 font-bold';
+	                                return `
+	                                    <tr class="hover:bg-slate-50 transition-colors">
+	                                        <td class="px-4 py-3 min-w-[260px] text-sm font-medium text-slate-900">${escapeHTML(row.key)}</td>
+	                                        <td class="px-4 py-3 whitespace-nowrap text-sm text-slate-600">${escapeHTML(summarizeHVCContext(row.rows, 'Country') || 'Unknown')}</td>
+	                                        <td class="px-4 py-3 whitespace-nowrap text-sm text-slate-600">${escapeHTML(summarizeHVCContext(row.rows, 'Vendor') || 'Unknown')}</td>
+	                                        <td class="px-4 py-3 whitespace-nowrap text-sm text-right font-bold text-slate-900">${formatNumber(row.hvc)}</td>
+	                                        <td class="px-4 py-3 whitespace-nowrap text-sm text-right text-slate-600">${formatNumber(row.phvc)}</td>
+	                                        <td class="px-4 py-3 whitespace-nowrap text-sm text-right ${ratioClass}">${formatHVCRatio(row.hvc, row.phvc)}</td>
+	                                        <td class="px-4 py-3 whitespace-nowrap text-sm text-right text-slate-600">${share.toFixed(1)}%</td>
+	                                    </tr>`;
+	                            }).join('')}
+	                        </tbody>
+	                    </table>
+	                </div>
+	            `;
+	        }
+
 	        function getHVCTimeframeMonths(monthLabels) {
 	            const selected = hvcTimeframeSelector.value || 'latest';
 	            if (!monthLabels.length) return { months: [], label: 'No months' };
@@ -2202,6 +2266,10 @@ CAN,tradedesk,2025-09,80,38.00,2400,200</textarea>
 	            const topVendors = groupHVC(hvcRows, row => row.Vendor)
 	                .sort((a, b) => b.hvc - a.hvc || b.phvc - a.phvc)
 	                .slice(0, 8);
+	            const strategyRows = groupHVC(hvcRows, row => row.AdsetName)
+	                .filter(item => item.hvc > 0 || item.phvc > 0)
+	                .sort((a, b) => b.hvc - a.hvc || b.phvc - a.phvc || a.key.localeCompare(b.key))
+	                .slice(0, 25);
 
 	            const summaryCards = [
 	                { label: 'HVC_30d', value: formatNumber(totals.hvc), helper: `Observed HVCs across ${timeframe.months.length} month${timeframe.months.length === 1 ? '' : 's'}` },
@@ -2247,6 +2315,17 @@ CAN,tradedesk,2025-09,80,38.00,2400,200</textarea>
 	                <div class="grid grid-cols-1 lg:grid-cols-2 gap-4">
 	                    ${compactList('Top Countries', topCountries)}
 	                    ${compactList('Top Vendors', topVendors)}
+	                </div>
+
+	                <div class="bg-white rounded-xl border border-slate-200 overflow-hidden">
+	                    <div class="p-4 border-b border-slate-100 flex flex-col md:flex-row md:items-center md:justify-between gap-2">
+	                        <div>
+	                            <h4 class="font-bold text-slate-900">Strategy / Ad Group HVC Split</h4>
+	                            <p class="text-sm text-slate-500">Sorted by observed HVC_30d contribution to show which activities are doing the heavy lifting.</p>
+	                        </div>
+	                        <span class="bg-slate-100 text-slate-600 text-xs font-medium px-2.5 py-1 rounded">Top ${strategyRows.length}</span>
+	                    </div>
+	                    ${renderHVCStrategyTable(strategyRows, totals.hvc)}
 	                </div>
 
 	                <div class="bg-white rounded-xl border border-slate-200 overflow-hidden">
