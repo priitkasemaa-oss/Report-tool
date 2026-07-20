@@ -426,6 +426,13 @@ CAN,tradedesk,2025-09,80,38.00,2400,200</textarea>
                                 <!-- Options populated dynamically -->
                             </select>
                         </div>
+                        <div class="relative">
+                            <label class="absolute -top-2 left-2 bg-white px-1 text-xs font-semibold text-indigo-600">Country</label>
+                            <select id="countrySelector" class="block w-full pl-3 pr-10 py-2.5 text-sm border-slate-300 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent rounded-lg border bg-white shadow-sm font-medium text-slate-700 hover:border-indigo-300 transition-colors">
+                                <option value="All">All Countries</option>
+                                <!-- Options populated dynamically -->
+                            </select>
+                        </div>
                     </div>
                 </div>
 
@@ -840,6 +847,7 @@ CAN,tradedesk,2025-09,80,38.00,2400,200</textarea>
         const fileUpload = document.getElementById('fileUpload');
         const regionSelector = document.getElementById('regionSelector');
         const vendorSelector = document.getElementById('vendorSelector');
+        const countrySelector = document.getElementById('countrySelector');
         const analysisSection = document.getElementById('analysisSection');
         const welcomeMessage = document.getElementById('welcomeMessage');
         const copyBtn = document.getElementById('copyBtn');
@@ -908,13 +916,25 @@ CAN,tradedesk,2025-09,80,38.00,2400,200</textarea>
                 welcomeMessage.classList.add('hidden');
                 analysisSection.classList.remove('hidden');
                 populateVendorSelector(); // Dynamic vendors
+                populateCountrySelector();
                 processAndDisplayData();
             };
             reader.readAsText(file);
         });
 
-        regionSelector.addEventListener('change', () => { if (parsedData.length) processAndDisplayData(); });
-        vendorSelector.addEventListener('change', () => { if (parsedData.length) processAndDisplayData(); });
+        regionSelector.addEventListener('change', () => {
+            if (parsedData.length) {
+                populateCountrySelector();
+                processAndDisplayData();
+            }
+        });
+        vendorSelector.addEventListener('change', () => {
+            if (parsedData.length) {
+                populateCountrySelector();
+                processAndDisplayData();
+            }
+        });
+        countrySelector.addEventListener('change', () => { if (parsedData.length) processAndDisplayData(); });
         hvcTimeframeSelector.addEventListener('change', () => { if (parsedData.length) processAndDisplayData(); });
 
         chartViewBtn.addEventListener('click', () => { showTab(chartView); updateTabStyles(chartViewBtn); });
@@ -1058,6 +1078,7 @@ CAN,tradedesk,2025-09,80,38.00,2400,200</textarea>
             welcomeMessage.classList.add('hidden');
             analysisSection.classList.remove('hidden');
             populateVendorSelector();
+            populateCountrySelector();
             processAndDisplayData();
         }
 
@@ -1186,6 +1207,35 @@ CAN,tradedesk,2025-09,80,38.00,2400,200</textarea>
             });
         }
 
+        function matchesRegionAndVendor(row, selectedRegion, selectedVendor) {
+            const regionMatch = selectedRegion === 'Global' || getRegionForCountry(row.Country) === selectedRegion;
+            const vendorMatch = selectedVendor === 'All' || (row.Vendor && row.Vendor.toLowerCase() === selectedVendor.toLowerCase());
+            return regionMatch && vendorMatch;
+        }
+
+        function populateCountrySelector() {
+            if (!countrySelector) return;
+            const previousCountry = countrySelector.value || 'All';
+            const selectedRegion = regionSelector.value;
+            const selectedVendor = vendorSelector.value;
+            const countries = [...new Set(parsedData
+                .filter(row => matchesRegionAndVendor(row, selectedRegion, selectedVendor))
+                .filter(row => row.Country && (row.MNCs > 0 || row.Spend > 0 || row.Registrations > 0 || row.HVC30d > 0 || row.pHVC30d > 0))
+                .map(row => row.Country))]
+                .sort();
+
+            countrySelector.innerHTML = '<option value="All">All Countries</option>';
+            countries.forEach(country => {
+                const option = document.createElement('option');
+                option.value = country;
+                option.textContent = country;
+                countrySelector.appendChild(option);
+            });
+
+            countrySelector.value = countries.includes(previousCountry) ? previousCountry : 'All';
+            countrySelector.disabled = countries.length === 0;
+        }
+
         function getDateRangeFromData(data) {
             if (!data || !data.length) return [];
             const monthSet = new Set(data.map(row => row.Month).filter(Boolean));
@@ -1275,11 +1325,11 @@ CAN,tradedesk,2025-09,80,38.00,2400,200</textarea>
         function getRowsForCurrentSelection() {
             const selectedRegion = regionSelector.value;
             const selectedVendor = vendorSelector.value;
+            const selectedCountry = countrySelector.value;
 
             return parsedData.filter(row => {
-                const regionMatch = selectedRegion === 'Global' || getRegionForCountry(row.Country) === selectedRegion;
-                const vendorMatch = selectedVendor === 'All' || (row.Vendor && row.Vendor.toLowerCase() === selectedVendor.toLowerCase());
-                return regionMatch && vendorMatch;
+                const countryMatch = selectedCountry === 'All' || row.Country === selectedCountry;
+                return matchesRegionAndVendor(row, selectedRegion, selectedVendor) && countryMatch;
             });
         }
 
@@ -1359,6 +1409,7 @@ CAN,tradedesk,2025-09,80,38.00,2400,200</textarea>
 
             const selectedRegion = getRegionLabel(regionSelector.value);
             const selectedVendor = vendorSelector.value === 'All' ? 'all vendors' : vendorSelector.value;
+            const selectedCountry = countrySelector.value === 'All' ? 'all countries' : countrySelector.value;
             const latestRows = data.filter(row => row.Month === latestMonth);
             const { best, risk, topSpend } = getBestAndRiskRows(latestRows);
             const target = parseFloat(document.getElementById('benchmarkInput').value) || 15;
@@ -1379,7 +1430,7 @@ CAN,tradedesk,2025-09,80,38.00,2400,200</textarea>
                 ? `Watch <strong>${risk.Country} (${risk.Vendor})</strong>, where payback is ${risk.payback.toFixed(1)}m.`
                 : 'No major latest-month payback risk stands out against the target.';
 
-            return `For <strong>${latestMonth}</strong>, ${selectedRegion} / ${selectedVendor} delivered <strong>${formatNumber(curr.totalMNCs ?? curr.mncs)} MNCs</strong> on <strong>${formatCurrency(curr.totalSpend ?? curr.spend)}</strong>, with weighted LTV of <strong>${formatCurrency(curr.ltv, 2)}</strong> and <strong>${curr.payback.toFixed(1)}m payback</strong>, ${targetText}. ${momText} ${driverText} ${efficiencyText} ${riskText}`;
+            return `For <strong>${latestMonth}</strong>, ${selectedRegion} / ${selectedVendor} / ${selectedCountry} delivered <strong>${formatNumber(curr.totalMNCs ?? curr.mncs)} MNCs</strong> on <strong>${formatCurrency(curr.totalSpend ?? curr.spend)}</strong>, with weighted LTV of <strong>${formatCurrency(curr.ltv, 2)}</strong> and <strong>${curr.payback.toFixed(1)}m payback</strong>, ${targetText}. ${momText} ${driverText} ${efficiencyText} ${riskText}`;
         }
 
         function buildStrategyRecommendations(rows) {
@@ -1830,33 +1881,12 @@ CAN,tradedesk,2025-09,80,38.00,2400,200</textarea>
         function processAndDisplayData() {
             const selectedRegion = regionSelector.value;
             const selectedVendor = vendorSelector.value;
+            const selectedCountry = countrySelector.value;
             const monthLabels = getDateRangeFromData(parsedData);
-            
-            const allValidCountries = Object.values(regions).flat();
-            
-            // RELAXED FILTER: Allow any country for manual entry, map to ROW if unknown
-            // If user uploads CSV with standard headers, we filter normally.
-            // If user inputs manual data, we accept it.
-            
-            let filteredData = parsedData.filter(row => {
-                 // If it's a known country, keep it. If unknown, we keep it and will map to ROW later.
-                 return true; 
-            });
+            let filteredData = parsedData.filter(row => matchesRegionAndVendor(row, selectedRegion, selectedVendor));
 
-            if (selectedRegion !== 'Global') {
-                filteredData = filteredData.filter(row => {
-                    // If known country, filter by region. If unknown, filter by ROW
-                    const known = allValidCountries.includes(row.Country);
-                    if (known) {
-                         return regions[selectedRegion].includes(row.Country);
-                    } else {
-                         return selectedRegion === 'ROW'; // Unknowns go to ROW
-                    }
-                });
-            }
-
-            if (selectedVendor !== 'All') {
-                filteredData = filteredData.filter(row => row.Vendor && row.Vendor.toLowerCase() === selectedVendor.toLowerCase());
+            if (selectedCountry !== 'All') {
+                filteredData = filteredData.filter(row => row.Country === selectedCountry);
             }
 
             const monthlyMetrics = {};
@@ -1927,9 +1957,9 @@ CAN,tradedesk,2025-09,80,38.00,2400,200</textarea>
             updateChart(monthLabels, chartData);
             updateConversionChart(monthLabels, chartData.conversion); // New Chart
             updateEfficiencyChart(filteredData);
-	            updateWalletChart(parsedData, monthLabels[monthLabels.length - 1]); 
+	            updateWalletChart(filteredData, monthLabels[monthLabels.length - 1]); 
 	            updateGeoMap(filteredData);
-	            generateTableView();
+	            generateTableView(filteredData);
 	            renderHVCView(filteredData, monthLabels);
 	            updateStrategyView(filteredData, monthLabels, parsedData);
             
@@ -3228,9 +3258,8 @@ CAN,tradedesk,2025-09,80,38.00,2400,200</textarea>
             });
         }
         
-        function generateTableView() {
+        function generateTableView(data = parsedData) {
             const allValidCountries = Object.values(regions).flat();
-            const data = parsedData;
             const monthLabels = getDateRangeFromData(data);
             
             if (!monthLabels.length) {
@@ -3241,7 +3270,7 @@ CAN,tradedesk,2025-09,80,38.00,2400,200</textarea>
             const latestMonth = monthLabels[monthLabels.length - 1];
             const latestMonthData = data.filter(row => row.Month === latestMonth);
             // DYNAMIC VENDORS for Table
-            const vendors = ['All', ...new Set(parsedData.map(item => item.Vendor))].sort();
+            const vendors = ['All', ...new Set(data.map(item => item.Vendor).filter(Boolean))].sort();
             const safeDomId = (value) => String(value || 'all').toLowerCase().replace(/[^a-z0-9_-]+/g, '-').replace(/^-+|-+$/g, '') || 'all';
             const vendorTabs = vendors.map((value, index) => ({
                 value,
