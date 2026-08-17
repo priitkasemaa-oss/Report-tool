@@ -310,7 +310,7 @@
                             <button id="copyBtn" class="text-xs text-indigo-600 hover:text-indigo-800 font-medium transition-colors">Copy to Clipboard</button>
                         </div>
                         <div class="relative">
-                            <textarea id="sampleData" rows="8" class="shadow-inner focus:ring-indigo-500 focus:border-indigo-500 block w-full sm:text-xs border-slate-300 rounded-lg font-mono bg-slate-900 text-slate-300 p-4 leading-relaxed" readonly>Country,Vendor,Report Month,MNCs,LTV,Media Spend,Internal Registrations
+                            <textarea id="sampleData" rows="8" class="shadow-inner focus:ring-indigo-500 focus:border-indigo-500 block w-full sm:text-xs border-slate-300 rounded-lg font-mono bg-slate-900 text-slate-300 p-4 leading-relaxed" readonly>Country,Vendor,Report Month,MNCs,LTV,Media Spend USD,Internal Registrations
 CAN,google,2025-10,89,39.81,2787.48,200
 CAN,tradedesk,2025-10,16,37.65,0,40
 USA,google,2025-10,28,48.35,20.16,100
@@ -334,8 +334,8 @@ CAN,tradedesk,2025-09,80,38.00,2400,200</textarea>
                                     <th class="px-3 py-2 text-left text-xs font-medium text-slate-500 uppercase">Vendor</th>
                                     <th class="px-3 py-2 text-left text-xs font-medium text-slate-500 uppercase">Month (YYYY-MM)</th>
                                     <th class="px-3 py-2 text-right text-xs font-medium text-slate-500 uppercase">MNCs</th>
-                                    <th class="px-3 py-2 text-right text-xs font-medium text-slate-500 uppercase">LTV</th>
-                                    <th class="px-3 py-2 text-right text-xs font-medium text-slate-500 uppercase">Spend</th>
+                                    <th class="px-3 py-2 text-right text-xs font-medium text-slate-500 uppercase">LTV (USD)</th>
+                                    <th class="px-3 py-2 text-right text-xs font-medium text-slate-500 uppercase">Spend (USD)</th>
                                     <th class="px-3 py-2 text-right text-xs font-medium text-slate-500 uppercase">Registrations</th>
                                     <th class="px-3 py-2"></th>
                                 </tr>
@@ -625,8 +625,8 @@ CAN,tradedesk,2025-09,80,38.00,2400,200</textarea>
                                     </div>
                                 </div>
                                 <div id="goalResult" class="p-4 bg-slate-50 rounded-lg border border-slate-100 hidden">
-                                    <p class="text-xs text-slate-500 uppercase font-bold">Required Spend</p>
-                                    <p class="text-2xl font-bold text-indigo-600 mt-1" id="goalSpendVal">£0</p>
+                                    <p class="text-xs text-slate-500 uppercase font-bold">Required Spend (USD)</p>
+                                    <p class="text-2xl font-bold text-indigo-600 mt-1" id="goalSpendVal">$0</p>
                                     <p class="text-xs text-slate-400 mt-2">Based on current global weighted CPA</p>
                                 </div>
                             </div>
@@ -650,7 +650,7 @@ CAN,tradedesk,2025-09,80,38.00,2400,200</textarea>
                         <div class="bg-white p-6 rounded-xl shadow-sm border border-slate-200">
                             <div class="mb-4">
                                 <h3 class="text-lg font-bold text-slate-900">Saturation Analysis</h3>
-                                <p class="text-sm text-slate-500">Spend vs. CPA Correlation (Monthly Data Points)</p>
+                                <p class="text-sm text-slate-500">Spend vs. CPA Correlation (USD Monthly Data Points)</p>
                             </div>
                             <div class="chart-container">
                                 <canvas id="saturationChart"></canvas>
@@ -669,7 +669,7 @@ CAN,tradedesk,2025-09,80,38.00,2400,200</textarea>
                                     </div>
                                     <h3 class="text-lg font-bold text-slate-900">Zombie Market Hunter</h3>
                                 </div>
-                                <p class="text-sm text-slate-500">Markets with Spend > £100 but 0 MNCs or Payback > 25m.</p>
+                                <p class="text-sm text-slate-500">Markets with Spend > $100 but 0 MNCs or Payback > 25m.</p>
                             </div>
                             <div class="overflow-y-auto custom-scrollbar" style="max-height: 320px;">
                                 <div id="zombieList" class="space-y-2">
@@ -985,7 +985,7 @@ CAN,tradedesk,2025-09,80,38.00,2400,200</textarea>
             const target = parseFloat(goalMNCInput.value);
             if (!target || !currentMetrics || currentMetrics.cpa <= 0) return;
             const reqSpend = target * currentMetrics.cpa;
-            document.getElementById('goalSpendVal').textContent = `£${reqSpend.toLocaleString(undefined, {maximumFractionDigits: 0})}`;
+            document.getElementById('goalSpendVal').textContent = `$${reqSpend.toLocaleString(undefined, {maximumFractionDigits: 0})}`;
             document.getElementById('goalResult').classList.remove('hidden');
         });
 
@@ -1112,8 +1112,13 @@ CAN,tradedesk,2025-09,80,38.00,2400,200</textarea>
                 'internal measures ltv': 'LTV',
                 'ltv': 'LTV',
                 'ad delivery media spend': 'Spend',
+                'ad delivery media spend usd': 'Spend',
                 'media spend': 'Spend',
+                'media spend usd': 'Spend',
+                'media spend (usd)': 'Spend',
                 'spend': 'Spend',
+                'spend usd': 'Spend',
+                'spend (usd)': 'Spend',
                 'internal measures internal registrations': 'Registrations',
 	                'internal registrations': 'Registrations',
 	                'registrations': 'Registrations',
@@ -1139,7 +1144,17 @@ CAN,tradedesk,2025-09,80,38.00,2400,200</textarea>
 	                    if (!header) return 'unknown';
 	                    const cleaned = String(header).replace(/\uFEFF/g, '').toLowerCase().replace(/["']/g, '').replace(/\s+/g, ' ').trim();
 	                    const masterReportTail = cleaned.includes(' master report ') ? cleaned.split(' master report ').pop() : cleaned;
-	                    return headerMapping[cleaned] || headerMapping[masterReportTail] || header;
+	                    const dashTail = cleaned.includes(' - ') ? cleaned.split(' - ').pop() : cleaned;
+	                    const currencyFree = (value) => value
+	                        .replace(/\s*\((usd|gbp|eur)\)\s*$/i, '')
+	                        .replace(/\s+(usd|gbp|eur)\s*$/i, '')
+	                        .trim();
+	                    return headerMapping[cleaned]
+                            || headerMapping[masterReportTail]
+                            || headerMapping[dashTail]
+                            || headerMapping[currencyFree(masterReportTail)]
+                            || headerMapping[currencyFree(dashTail)]
+                            || header;
 	                }
 	            });
 
@@ -1152,7 +1167,11 @@ CAN,tradedesk,2025-09,80,38.00,2400,200</textarea>
                 // Helper to safely parse numbers
                 const parseNum = (val) => {
                     if (val === undefined || val === null || val === '') return 0;
-                    const n = parseFloat(String(val).replace(/["',£$]/g, '').trim());
+                    const cleaned = String(val)
+                        .replace(/["',$]/g, '')
+                        .replace(/[A-Za-z]/g, '')
+                        .trim();
+                    const n = parseFloat(cleaned);
                     return isNaN(n) ? 0 : n;
                 };
 
@@ -1265,7 +1284,7 @@ CAN,tradedesk,2025-09,80,38.00,2400,200</textarea>
             const topMarkets = Object.entries(countrySpend)
                 .sort((a,b) => b[1].s - a[1].s)
                 .slice(0, 5)
-                .map(([c, d]) => `${c} (Spend: £${Math.round(d.s)}, CPA: £${(d.s/d.m).toFixed(0)})`)
+                .map(([c, d]) => `${c} (Spend: $${Math.round(d.s)}, CPA: $${(d.s/d.m).toFixed(0)})`)
                 .join(', ');
 
             // Vendor Split
@@ -1278,9 +1297,9 @@ CAN,tradedesk,2025-09,80,38.00,2400,200</textarea>
             const vendorSummary = Object.entries(vendorSpend).map(([v, s]) => `${v}: ${Math.round((s/totalSpend)*100)}%`).join(', ');
 
             return `
-                Total Spend: £${Math.round(totalSpend)}
+                Total Spend (USD): $${Math.round(totalSpend)}
                 Total MNCs: ${Math.round(totalMNCs)}
-                Avg CPA: £${avgCPA.toFixed(2)}
+                Avg CPA (USD): $${avgCPA.toFixed(2)}
                 Top Markets: ${topMarkets}
                 Vendor Split: ${vendorSummary}
                 Data period: ${getDateRangeFromData(parsedData).join(', ')}
@@ -1314,7 +1333,7 @@ CAN,tradedesk,2025-09,80,38.00,2400,200</textarea>
         }
 
         function formatCurrency(value, digits = 0) {
-            return `£${(value || 0).toLocaleString(undefined, { minimumFractionDigits: digits, maximumFractionDigits: digits })}`;
+            return `$${(value || 0).toLocaleString(undefined, { minimumFractionDigits: digits, maximumFractionDigits: digits })}`;
         }
 
         function formatPercent(value, digits = 1) {
@@ -1725,9 +1744,9 @@ CAN,tradedesk,2025-09,80,38.00,2400,200</textarea>
                 [Paragraph summary. Discuss Total Spend, MNCs, and overall efficiency. Celebrate if under 15m.]
 
                 ## Regional Deep Dives
-                [For each major region (ignore regions with < £100 spend), provide:]
+                [For each major region (ignore regions with < $100 spend), provide:]
                 ### [Region Name]
-                * **Overall:** Spend: £[Value], MNCs: [Value], Payback: [Value]m. [One sentence summary of regional trend].
+                * **Overall:** Spend (USD): $[Value], MNCs: [Value], Payback: [Value]m. [One sentence summary of regional trend].
                 * **Vendor Breakdown:**
                     * [Vendor A]: Payback [X]m. [Brief comment on performance].
                     * [Vendor B]: Payback [X]m. ...
@@ -1979,7 +1998,7 @@ CAN,tradedesk,2025-09,80,38.00,2400,200</textarea>
                 <thead class="bg-slate-50">
                     <tr>
                         <th class="px-6 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider">Total MNCs</th>
-                        <th class="px-6 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider">Total Spend</th>
+                        <th class="px-6 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider">Total Spend (USD)</th>
                         <th class="px-6 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider">W. Avg LTV</th>
                         <th class="px-6 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider">W. Avg Payback</th>
                     </tr>
@@ -1987,8 +2006,8 @@ CAN,tradedesk,2025-09,80,38.00,2400,200</textarea>
                 <tbody class="bg-white divide-y divide-slate-200">
                     <tr>
                         <td class="px-6 py-4 whitespace-nowrap text-sm text-slate-900 font-bold">${Math.round(aggMNCs).toLocaleString()}</td>
-                        <td class="px-6 py-4 whitespace-nowrap text-sm text-slate-900 font-bold">£${Math.round(aggSpend).toLocaleString()}</td>
-                        <td class="px-6 py-4 whitespace-nowrap text-sm text-slate-900 font-bold">£${aggAvgLTV.toFixed(2)}</td>
+                        <td class="px-6 py-4 whitespace-nowrap text-sm text-slate-900 font-bold">$${Math.round(aggSpend).toLocaleString()}</td>
+                        <td class="px-6 py-4 whitespace-nowrap text-sm text-slate-900 font-bold">$${aggAvgLTV.toFixed(2)}</td>
                         <td class="px-6 py-4 whitespace-nowrap text-sm text-slate-900 font-bold">${aggPayback.toFixed(1)}m</td>
                     </tr>
                 </tbody>
@@ -2103,8 +2122,8 @@ CAN,tradedesk,2025-09,80,38.00,2400,200</textarea>
 
             const kpis = [
                 { label: 'Total MNCs', value: Math.round(curr.totalMNCs).toLocaleString(), delta: mncsD, icon: 'M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z' },
-                { label: 'Total Spend', value: `£${curr.totalSpend.toLocaleString(undefined, {minimumFractionDigits: 0, maximumFractionDigits: 0})}`, delta: spendD, icon: 'M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z' },
-                { label: 'W. Avg. LTV', value: `£${curr.ltv.toFixed(2)}`, delta: ltvD, icon: 'M13 7h8m0 0v8m0-8l-8 8-4-4-6 6' },
+                { label: 'Total Spend (USD)', value: `$${curr.totalSpend.toLocaleString(undefined, {minimumFractionDigits: 0, maximumFractionDigits: 0})}`, delta: spendD, icon: 'M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z' },
+                { label: 'W. Avg. LTV (USD)', value: `$${curr.ltv.toFixed(2)}`, delta: ltvD, icon: 'M13 7h8m0 0v8m0-8l-8 8-4-4-6 6' },
                 { label: 'W. Avg. Payback', value: `${curr.payback.toFixed(1)} mo`, delta: paybackD, icon: 'M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z' }
             ];
 
@@ -2451,7 +2470,7 @@ CAN,tradedesk,2025-09,80,38.00,2400,200</textarea>
                         <span class="text-sm font-bold text-slate-800 block">${z.label}</span>
                         <span class="text-xs text-rose-600">${z.reason}</span>
                     </div>
-                    <span class="text-sm font-mono font-bold text-slate-700">£${Math.round(z.spend).toLocaleString()}</span>
+                    <span class="text-sm font-mono font-bold text-slate-700">$${Math.round(z.spend).toLocaleString()}</span>
                 </div>
             `).join('');
         }
@@ -2496,7 +2515,7 @@ CAN,tradedesk,2025-09,80,38.00,2400,200</textarea>
                     if(d.m > 0 && d.s > 0) {
                         const cpa = d.s / d.m;
                         row.push(cpa);
-                        textRow.push('£' + Math.round(cpa));
+                        textRow.push('$' + Math.round(cpa));
                         hasData = true;
                     } else {
                         row.push(null);
@@ -2526,7 +2545,7 @@ CAN,tradedesk,2025-09,80,38.00,2400,200</textarea>
                 reversescale: false, 
                 showscale: true,
                 hoverongaps: false,
-                hovertemplate: 'Region: %{y}<br>Month: %{x}<br>CPA: £%{z:.2f}<extra></extra>'
+                hovertemplate: 'Region: %{y}<br>Month: %{x}<br>CPA: $%{z:.2f}<extra></extra>'
             }];
 
             const layout = {
@@ -2586,15 +2605,15 @@ CAN,tradedesk,2025-09,80,38.00,2400,200</textarea>
                     <div class="bg-black/20 rounded-lg p-3 text-sm space-y-2">
                         <div class="flex justify-between items-center">
                             <span class="text-indigo-100">Move Budget From:</span>
-                            <span class="font-bold text-rose-300 text-right">${formatVendor(worst.vendor)} ${worst.country}<br><span class="text-xs font-normal opacity-75">(CPA £${worst.cpa.toFixed(0)})</span></span>
+                            <span class="font-bold text-rose-300 text-right">${formatVendor(worst.vendor)} ${worst.country}<br><span class="text-xs font-normal opacity-75">(CPA $${worst.cpa.toFixed(0)})</span></span>
                         </div>
                         <div class="flex justify-between items-center">
                             <span class="text-indigo-100">Reallocate To:</span>
-                            <span class="font-bold text-emerald-300 text-right">${formatVendor(best.vendor)} ${best.country}<br><span class="text-xs font-normal opacity-75">(CPA £${best.cpa.toFixed(0)})</span></span>
+                            <span class="font-bold text-emerald-300 text-right">${formatVendor(best.vendor)} ${best.country}<br><span class="text-xs font-normal opacity-75">(CPA $${best.cpa.toFixed(0)})</span></span>
                         </div>
                         <div class="border-t border-white/10 pt-2 flex justify-between text-xs text-indigo-200">
                             <span>Shift Amount (10%):</span>
-                            <span>£${shiftAmount.toLocaleString(undefined, {maximumFractionDigits:0})}</span>
+                            <span>$${shiftAmount.toLocaleString(undefined, {maximumFractionDigits:0})}</span>
                         </div>
                     </div>
                 </div>
@@ -2657,14 +2676,14 @@ CAN,tradedesk,2025-09,80,38.00,2400,200</textarea>
                             callbacks: {
                                 label: (ctx) => {
                                     const p = ctx.raw;
-                                    return `${ctx.dataset.label} (${p.month}): Spend £${Math.round(p.x).toLocaleString()}, CPA £${p.y.toFixed(2)}`;
+                                    return `${ctx.dataset.label} (${p.month}): Spend $${Math.round(p.x).toLocaleString()}, CPA $${p.y.toFixed(2)}`;
                                 }
                             }
                         }
                     },
                     scales: {
-                        x: { title: { display: true, text: 'Monthly Spend (£)' }, grid: { color: '#f1f5f9' } },
-                        y: { title: { display: true, text: 'CPA (£)' }, grid: { color: '#f1f5f9' } }
+                        x: { title: { display: true, text: 'Monthly Spend (USD)' }, grid: { color: '#f1f5f9' } },
+                        y: { title: { display: true, text: 'CPA (USD)' }, grid: { color: '#f1f5f9' } }
                     }
                 }
             });
@@ -2819,8 +2838,8 @@ CAN,tradedesk,2025-09,80,38.00,2400,200</textarea>
                                     const v = vendors[ctx.datasetIndex];
                                     const m = metrics.find(x => x.v === v);
                                     if (idx === 0) return `Volume: ${Math.round(m.vol).toLocaleString()}`;
-                                    if (idx === 1) return `LTV: £${m.ltv.toFixed(2)}`;
-                                    if (idx === 2) return `CPA: £${m.cpa.toFixed(2)}`;
+                                    if (idx === 1) return `LTV: $${m.ltv.toFixed(2)}`;
+                                    if (idx === 2) return `CPA: $${m.cpa.toFixed(2)}`;
                                     if (idx === 3) return `Payback: ${m.payback.toFixed(1)}m`;
                                 }
                             }
@@ -2879,7 +2898,7 @@ CAN,tradedesk,2025-09,80,38.00,2400,200</textarea>
                             callbacks: {
                                 label: (ctx) => {
                                     const p = ctx.raw;
-                                    return `${p.country}: CPA £${p.x.toFixed(0)}, LTV £${p.y.toFixed(0)}, MNCs ${Math.round(p.mncs).toLocaleString()}`;
+                                    return `${p.country}: CPA $${p.x.toFixed(0)}, LTV $${p.y.toFixed(0)}, MNCs ${Math.round(p.mncs).toLocaleString()}`;
                                 }
                             }
                         },
@@ -2903,8 +2922,8 @@ CAN,tradedesk,2025-09,80,38.00,2400,200</textarea>
                         }
                     },
                     scales: {
-                        x: { title: { display: true, text: 'CPA (£)' }, grid: { color: '#f1f5f9' } },
-                        y: { title: { display: true, text: 'LTV (£)' }, grid: { color: '#f1f5f9' } }
+                        x: { title: { display: true, text: 'CPA (USD)' }, grid: { color: '#f1f5f9' } },
+                        y: { title: { display: true, text: 'LTV (USD)' }, grid: { color: '#f1f5f9' } }
                     }
                 }
             });
@@ -3114,7 +3133,7 @@ CAN,tradedesk,2025-09,80,38.00,2400,200</textarea>
                             } 
                         },
                         { 
-                            label: 'Spend (£)', 
+                            label: 'Spend (USD)', 
                             data: data.spend, 
                             type: 'line', 
                             borderColor: cSpend, 
@@ -3132,11 +3151,11 @@ CAN,tradedesk,2025-09,80,38.00,2400,200</textarea>
                                 align: 'top',    // Strategy: Always TOP
                                 anchor: 'end',   
                                 offset: 10,
-                                formatter: (v) => '£' + Math.round(v/1000) + 'k'
+                                formatter: (v) => '$' + Math.round(v/1000) + 'k'
                             }
                         },
                         { 
-                            label: 'LTV (£)', 
+                            label: 'LTV (USD)', 
                             data: data.ltv, 
                             type: 'line', 
                             borderColor: cLTV, 
@@ -3155,7 +3174,7 @@ CAN,tradedesk,2025-09,80,38.00,2400,200</textarea>
                                 align: 'bottom', // Strategy: Always BOTTOM
                                 anchor: 'start',
                                 offset: 10,
-                                formatter: (v) => '£' + Math.round(v)
+                                formatter: (v) => '$' + Math.round(v)
                             }
                         },
                         { 
@@ -3206,8 +3225,8 @@ CAN,tradedesk,2025-09,80,38.00,2400,200</textarea>
                                 label: (ctx) => {
                                     let val = ctx.parsed.y;
                                     if(ctx.dataset.label.includes('Target')) return null;
-                                    if(ctx.dataset.yAxisID === 'yCurrency') return ` Spend: £${val.toLocaleString()}`;
-                                    if(ctx.dataset.yAxisID === 'yLTV') return ` LTV: £${val.toFixed(2)}`;
+                                    if(ctx.dataset.yAxisID === 'yCurrency') return ` Spend (USD): $${val.toLocaleString()}`;
+                                    if(ctx.dataset.yAxisID === 'yLTV') return ` LTV (USD): $${val.toFixed(2)}`;
                                     if(ctx.dataset.yAxisID === 'yPayback') return ` Payback: ${val.toFixed(1)} mo`;
                                     return ` MNCs: ${Math.round(val).toLocaleString()}`;
                                 }
@@ -3235,7 +3254,7 @@ CAN,tradedesk,2025-09,80,38.00,2400,200</textarea>
                             grace: '30%', 
                             grid: { color: '#f3f4f6' }, 
                             title: { display: true, text: 'Spend', color: cSpend }, 
-                            ticks: { color: cSpend, maxTicksLimit: 5, callback: v => '£' + (v/1000).toFixed(0) + 'k' } 
+                            ticks: { color: cSpend, maxTicksLimit: 5, callback: v => '$' + (v/1000).toFixed(0) + 'k' } 
                         },
                         yLTV: { 
                             type: 'linear', 
@@ -3243,7 +3262,7 @@ CAN,tradedesk,2025-09,80,38.00,2400,200</textarea>
                             grace: '30%',
                             grid: { display: false }, 
                             title: { display: true, text: 'LTV', color: cLTV }, 
-                            ticks: { color: cLTV, maxTicksLimit: 5, callback: v => '£' + v.toFixed(0) } 
+                            ticks: { color: cLTV, maxTicksLimit: 5, callback: v => '$' + v.toFixed(0) } 
                         },
                         yPayback: { 
                             type: 'linear', 
@@ -3299,8 +3318,8 @@ CAN,tradedesk,2025-09,80,38.00,2400,200</textarea>
                             <tr>
                                 <th class="px-6 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider">Region</th>
                                 <th class="px-6 py-3 text-right text-xs font-medium text-slate-500 uppercase tracking-wider">MNCs</th>
-                                <th class="px-6 py-3 text-right text-xs font-medium text-slate-500 uppercase tracking-wider">Spend</th>
-                                <th class="px-6 py-3 text-right text-xs font-medium text-slate-500 uppercase tracking-wider">LTV</th>
+                                <th class="px-6 py-3 text-right text-xs font-medium text-slate-500 uppercase tracking-wider">Spend (USD)</th>
+                                <th class="px-6 py-3 text-right text-xs font-medium text-slate-500 uppercase tracking-wider">LTV (USD)</th>
                                 <th class="px-6 py-3 text-right text-xs font-medium text-slate-500 uppercase tracking-wider">Payback</th>
                             </tr>
                         </thead>
@@ -3339,8 +3358,8 @@ CAN,tradedesk,2025-09,80,38.00,2400,200</textarea>
                     html += `<tr class="${rowClass}">
                         <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-slate-900">${regionName}</td>
                         <td class="px-6 py-4 whitespace-nowrap text-sm text-right text-slate-500">${Math.round(m.m).toLocaleString()}</td>
-                        <td class="px-6 py-4 whitespace-nowrap text-sm text-right text-slate-500">£${m.s.toLocaleString(undefined, {minimumFractionDigits:0, maximumFractionDigits:0})}</td>
-                        <td class="px-6 py-4 whitespace-nowrap text-sm text-right text-slate-500">£${m.l.toFixed(2)}</td>
+                        <td class="px-6 py-4 whitespace-nowrap text-sm text-right text-slate-500">$${m.s.toLocaleString(undefined, {minimumFractionDigits:0, maximumFractionDigits:0})}</td>
+                        <td class="px-6 py-4 whitespace-nowrap text-sm text-right text-slate-500">$${m.l.toFixed(2)}</td>
                         <td class="px-6 py-4 whitespace-nowrap text-sm text-right ${paybackColorClass}">${m.p.toFixed(1)}m</td>
                     </tr>`;
                 });
