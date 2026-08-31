@@ -310,16 +310,16 @@
                             <button id="copyBtn" class="text-xs text-indigo-600 hover:text-indigo-800 font-medium transition-colors">Copy to Clipboard</button>
                         </div>
                         <div class="relative">
-                            <textarea id="sampleData" rows="8" class="shadow-inner focus:ring-indigo-500 focus:border-indigo-500 block w-full sm:text-xs border-slate-300 rounded-lg font-mono bg-slate-900 text-slate-300 p-4 leading-relaxed" readonly>Country,Vendor,Report Month,MNCs,LTV,Media Spend USD,Internal Registrations
-CAN,google,2025-10,89,39.81,2787.48,200
-CAN,tradedesk,2025-10,16,37.65,0,40
-USA,google,2025-10,28,48.35,20.16,100
-USA,tradedesk,2025-10,624,52.88,43168.32,1500
-GBR,google,2025-10,150,45.50,6015,350
-GBR,tradedesk,2025-10,200,48.20,11060,500
-DEU,google,2025-10,300,55.10,15000,700
-USA,google,2025-09,550,51.50,35750,1300
-CAN,tradedesk,2025-09,80,38.00,2400,200</textarea>
+                            <textarea id="sampleData" rows="8" class="shadow-inner focus:ring-indigo-500 focus:border-indigo-500 block w-full sm:text-xs border-slate-300 rounded-lg font-mono bg-slate-900 text-slate-300 p-4 leading-relaxed" readonly>Date,Country,Vendor,Report Month,MNCs,LTV,Media Spend USD,Internal Registrations
+2025-10-01,CAN,google,2025-10,89,39.81,2787.48,200
+2025-10-01,CAN,tradedesk,2025-10,16,37.65,0,40
+2025-10-02,USA,google,2025-10,28,48.35,20.16,100
+2025-10-02,USA,tradedesk,2025-10,624,52.88,43168.32,1500
+2025-10-03,GBR,google,2025-10,150,45.50,6015,350
+2025-10-03,GBR,tradedesk,2025-10,200,48.20,11060,500
+2025-10-04,DEU,google,2025-10,300,55.10,15000,700
+2025-09-30,USA,google,2025-09,550,51.50,35750,1300
+2025-09-30,CAN,tradedesk,2025-09,80,38.00,2400,200</textarea>
                         </div>
                     </div>
                 </div>
@@ -1083,11 +1083,21 @@ CAN,tradedesk,2025-09,80,38.00,2400,200</textarea>
         }
 
         // --- Logic ---
-        function parseDateString(dateStr) {
+        function parseDateString(dateStr, monthKey = null) {
             if (!dateStr) return null;
-            let d = new Date(dateStr);
+            const raw = String(dateStr).trim();
+            const numericDay = raw.match(/^(\d{1,2})$/);
+            if (numericDay && monthKey) {
+                const monthParts = parseMonthKey(monthKey);
+                const day = parseInt(numericDay[1], 10);
+                if (monthParts && day >= 1 && day <= new Date(monthParts.year, monthParts.monthIndex + 1, 0).getDate()) {
+                    return new Date(monthParts.year, monthParts.monthIndex, day);
+                }
+            }
+
+            let d = new Date(raw);
             if (!isNaN(d.getTime())) return d;
-            const parts = dateStr.split(/[\/\-]/);
+            const parts = raw.split(/[\/\-]/);
             if (parts.length === 3) {
                 if (parts[0].length === 4) {
                     return new Date(parts[0], parts[1]-1, parts[2]);
@@ -1102,8 +1112,10 @@ CAN,tradedesk,2025-09,80,38.00,2400,200</textarea>
             const headerMapping = {
                 'region dimensions country': 'Country',
                 'country': 'Country',
+                'country 3 iso': 'Country',
                 'attribution params vendor': 'Vendor',
                 'vendor': 'Vendor',
+                'vendor cleaned': 'Vendor',
                 'timestamps month': 'Month',
                 'report month': 'Month',
                 'month': 'Month',
@@ -1134,6 +1146,14 @@ CAN,tradedesk,2025-09,80,38.00,2400,200</textarea>
 	                'phvc_30d': 'pHVC30d',
 	                'date': 'Date',
 	                'day': 'Date',
+	                'date day': 'Date',
+	                'interval day': 'Date',
+	                'intervals day': 'Date',
+	                'interval date': 'Date',
+	                'intervals date': 'Date',
+	                'report date': 'Date',
+	                'report day': 'Date',
+	                'timestamps day': 'Date',
 	                'timestamps date': 'Date'
 	            };
 
@@ -1147,14 +1167,25 @@ CAN,tradedesk,2025-09,80,38.00,2400,200</textarea>
 	                    const dashTail = cleaned.includes(' - ') ? cleaned.split(' - ').pop() : cleaned;
 	                    const currencyFree = (value) => value
 	                        .replace(/\s*\((usd|gbp|eur)\)\s*$/i, '')
-	                        .replace(/\s+(usd|gbp|eur)\s*$/i, '')
+	                        .replace(/[\s_]+(usd|gbp|eur)\s*$/i, '')
 	                        .trim();
-	                    return headerMapping[cleaned]
-                            || headerMapping[masterReportTail]
-                            || headerMapping[dashTail]
-                            || headerMapping[currencyFree(masterReportTail)]
-                            || headerMapping[currencyFree(dashTail)]
-                            || header;
+                        const stripKnownPrefixes = (value) => value
+                            .replace(/^dim_paid_daily_performance_/, '')
+                            .replace(/^paid_daily_performance_/, '')
+                            .replace(/^dim paid daily performance /, '')
+                            .replace(/^paid daily performance /, '')
+                            .trim();
+                        const toWords = (value) => value.replace(/_/g, ' ').replace(/\s+/g, ' ').trim();
+                        const candidates = [];
+                        [cleaned, masterReportTail, dashTail].forEach(value => {
+                            const stripped = stripKnownPrefixes(value);
+                            const worded = toWords(stripped);
+                            candidates.push(value, stripped, worded, currencyFree(stripped), currencyFree(worded));
+                        });
+                        for (const candidate of candidates) {
+                            if (headerMapping[candidate]) return headerMapping[candidate];
+                        }
+	                    return header;
 	                }
 	            });
 
@@ -1183,7 +1214,7 @@ CAN,tradedesk,2025-09,80,38.00,2400,200</textarea>
                 let foundDate = null;
                 if (row.Date) {
                     entry.Date = cleanStr(row.Date);
-                    foundDate = parseDateString(entry.Date);
+                    foundDate = parseDateString(entry.Date, entry.Month);
                 }
 
                 // If Month is missing but Date exists, fill Month
@@ -1897,6 +1928,145 @@ CAN,tradedesk,2025-09,80,38.00,2400,200</textarea>
             return { slope, intercept };
         }
 
+        function parseMonthKey(month) {
+            const match = String(month || '').match(/^(\d{4})-(\d{1,2})$/);
+            if (!match) return null;
+            const monthNumber = parseInt(match[2], 10);
+            if (monthNumber < 1 || monthNumber > 12) return null;
+            return {
+                year: parseInt(match[1], 10),
+                monthIndex: monthNumber - 1
+            };
+        }
+
+        function getDateOnlyKey(date) {
+            const y = date.getFullYear();
+            const m = String(date.getMonth() + 1).padStart(2, '0');
+            const d = String(date.getDate()).padStart(2, '0');
+            return `${y}-${m}-${d}`;
+        }
+
+        function formatShortDate(date) {
+            return date.toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
+        }
+
+        function buildLatestMonthForecast(rows, latestMonth, today = new Date()) {
+            const monthParts = parseMonthKey(latestMonth);
+            if (!monthParts) return null;
+
+            const latestRows = rows.filter(row => row.Month === latestMonth);
+            const activeLatestRows = latestRows.filter(row => (Number(row.MNCs) || 0) > 0 || (Number(row.Spend) || 0) > 0);
+            if (!activeLatestRows.length) return null;
+
+            const daysInMonth = new Date(monthParts.year, monthParts.monthIndex + 1, 0).getDate();
+            const monthStart = new Date(monthParts.year, monthParts.monthIndex, 1);
+            const monthEnd = new Date(monthParts.year, monthParts.monthIndex, daysInMonth);
+            const todayDate = new Date(today.getFullYear(), today.getMonth(), today.getDate());
+            const currentMNCs = activeLatestRows.reduce((sum, row) => sum + (Number(row.MNCs) || 0), 0);
+            const currentSpend = activeLatestRows.reduce((sum, row) => sum + (Number(row.Spend) || 0), 0);
+
+            const datedRows = activeLatestRows.filter(row => (
+                row.DateObj instanceof Date
+                && !isNaN(row.DateObj.getTime())
+                && row.DateObj.getFullYear() === monthParts.year
+                && row.DateObj.getMonth() === monthParts.monthIndex
+            ));
+
+            if (!datedRows.length) {
+                if (todayDate > monthEnd) {
+                    return {
+                        available: true,
+                        complete: true,
+                        latestDateKey: getDateOnlyKey(monthEnd),
+                        latestDateLabel: formatShortDate(monthEnd),
+                        elapsedDays: daysInMonth,
+                        daysInMonth,
+                        windowDays: 0,
+                        remainingDays: 0,
+                        avgDailyMNCs: 0,
+                        avgDailySpend: 0,
+                        forecastMNCs: currentMNCs,
+                        forecastSpend: currentSpend,
+                        note: `Latest month ${latestMonth} is complete.`
+                    };
+                }
+
+                if (todayDate >= monthStart && todayDate <= monthEnd) {
+                    const elapsedDays = Math.max(todayDate.getDate(), 1);
+                    const remainingDays = Math.max(daysInMonth - elapsedDays, 0);
+                    const avgDailyMNCs = currentMNCs / elapsedDays;
+                    const avgDailySpend = currentSpend / elapsedDays;
+                    return {
+                        available: true,
+                        inferred: true,
+                        latestDateKey: getDateOnlyKey(todayDate),
+                        latestDateLabel: formatShortDate(todayDate),
+                        elapsedDays,
+                        daysInMonth,
+                        windowDays: elapsedDays,
+                        remainingDays,
+                        avgDailyMNCs,
+                        avgDailySpend,
+                        forecastMNCs: currentMNCs + avgDailyMNCs * remainingDays,
+                        forecastSpend: currentSpend + avgDailySpend * remainingDays,
+                        note: 'No daily Date/Day column found, so this uses the month-to-date average.'
+                    };
+                }
+
+                return { available: false, note: 'Forecast needs daily Date/Day data or a current-month monthly total.' };
+            }
+
+            if (datedRows.length !== activeLatestRows.length) {
+                return { available: false, note: 'Forecast needs Date/Day populated on every latest-month row with MNCs or Spend.' };
+            }
+
+            const latestDate = datedRows.reduce((max, row) => row.DateObj > max ? row.DateObj : max, datedRows[0].DateObj);
+            const elapsedDays = Math.min(latestDate.getDate(), daysInMonth);
+            if (elapsedDays < 7) {
+                return { available: false, note: `Forecast needs at least 7 days of latest-month data; found ${elapsedDays}.` };
+            }
+
+            const daily = {};
+            for (let day = 1; day <= elapsedDays; day++) {
+                daily[day] = { mncs: 0, spend: 0 };
+            }
+
+            datedRows.forEach(row => {
+                const day = row.DateObj.getDate();
+                if (day >= 1 && day <= elapsedDays) {
+                    daily[day].mncs += Number(row.MNCs) || 0;
+                    daily[day].spend += Number(row.Spend) || 0;
+                }
+            });
+
+            const windowDays = 7;
+            const windowStart = elapsedDays - windowDays + 1;
+            let recentMNCs = 0;
+            let recentSpend = 0;
+            for (let day = windowStart; day <= elapsedDays; day++) {
+                recentMNCs += daily[day]?.mncs || 0;
+                recentSpend += daily[day]?.spend || 0;
+            }
+
+            const remainingDays = Math.max(daysInMonth - elapsedDays, 0);
+
+            return {
+                available: true,
+                complete: remainingDays === 0,
+                latestDateKey: getDateOnlyKey(latestDate),
+                latestDateLabel: formatShortDate(latestDate),
+                elapsedDays,
+                daysInMonth,
+                windowDays,
+                remainingDays,
+                avgDailyMNCs: recentMNCs / windowDays,
+                avgDailySpend: recentSpend / windowDays,
+                forecastMNCs: currentMNCs + (recentMNCs / windowDays) * remainingDays,
+                forecastSpend: currentSpend + (recentSpend / windowDays) * remainingDays,
+                note: `Uses the latest ${windowDays}-day average.`
+            };
+        }
+
         function processAndDisplayData() {
             const selectedRegion = regionSelector.value;
             const selectedVendor = vendorSelector.value;
@@ -1970,9 +2140,11 @@ CAN,tradedesk,2025-09,80,38.00,2400,200</textarea>
             }
 
             currentMetrics = latestMetrics;
+            const latestMonth = monthLabels[monthLabels.length - 1];
+            const latestMonthForecast = latestMonth ? buildLatestMonthForecast(filteredData, latestMonth) : null;
             
-            updateSummaryMetrics(latestMetrics, prevMetrics);
-            generateExecutiveSummary(latestMetrics, prevMetrics, filteredData, monthLabels[monthLabels.length - 1]);
+            updateSummaryMetrics(latestMetrics, prevMetrics, latestMonthForecast);
+            generateExecutiveSummary(latestMetrics, prevMetrics, filteredData, latestMonth);
             updateChart(monthLabels, chartData);
             updateConversionChart(monthLabels, chartData.conversion); // New Chart
             updateEfficiencyChart(filteredData);
@@ -2085,11 +2257,11 @@ CAN,tradedesk,2025-09,80,38.00,2400,200</textarea>
             });
         }
 
-	        function updateSummaryMetrics(curr, prev) {
-	            const container = document.getElementById('summaryMetrics');
-	            if (!curr) {
-	                container.innerHTML = `<div class="col-span-full text-center text-slate-500 py-4 bg-slate-50 rounded-lg">No data available for this selection.</div>`;
-	                return;
+	        function updateSummaryMetrics(curr, prev, forecast = null) {
+		            const container = document.getElementById('summaryMetrics');
+		            if (!curr) {
+		                container.innerHTML = `<div class="col-span-full text-center text-slate-500 py-4 bg-slate-50 rounded-lg">No data available for this selection.</div>`;
+		                return;
             }
 
             const calcDelta = (c, p) => {
@@ -2111,37 +2283,81 @@ CAN,tradedesk,2025-09,80,38.00,2400,200</textarea>
                 return {
                      val: `${Math.abs(d).toFixed(1)}%`, 
                      class: isBad ? 'text-rose-600 bg-rose-50' : 'text-emerald-600 bg-emerald-50',
-                     icon: d > 0 ? '↑' : '↓'
+	                     icon: d > 0 ? '↑' : '↓'
+	                };
+	            };
+
+                const getForecastCard = (metric) => {
+                    if (!forecast) return null;
+                    if (!forecast.available) {
+                        return {
+                            label: 'Forecast unavailable',
+                            value: '',
+                            note: forecast.note,
+                            muted: true
+                        };
+                    }
+
+                    const isSpend = metric === 'spend';
+                    const forecastValue = isSpend ? formatCurrency(forecast.forecastSpend) : formatNumber(forecast.forecastMNCs);
+                    const averageValue = isSpend ? formatCurrency(forecast.avgDailySpend) : formatNumber(forecast.avgDailyMNCs);
+                    if (forecast.complete) {
+                        return {
+                            label: 'Month complete',
+                            value: forecastValue,
+                            note: forecast.note || `Data through ${forecast.latestDateLabel} (${forecast.elapsedDays}/${forecast.daysInMonth} days).`,
+                            muted: false
+                        };
+                    }
+
+                    if (forecast.remainingDays <= 0) return null;
+
+                    const averageLabel = forecast.inferred
+                        ? `${forecast.elapsedDays}-day MTD avg`
+                        : `Last ${forecast.windowDays}-day avg`;
+                    const sourceNote = forecast.inferred ? ` ${forecast.note}` : '';
+                    return {
+                        label: 'Forecast month-end',
+                        value: forecastValue,
+                        note: `${averageLabel} ${averageValue}/day. Data through ${forecast.latestDateLabel} (${forecast.elapsedDays}/${forecast.daysInMonth} days).${sourceNote}`,
+                        muted: false
+                    };
                 };
-            };
 
-            const mncsD = calcDelta(curr.totalMNCs, prev ? prev.totalMNCs : 0);
-            const spendD = calcDelta(curr.totalSpend, prev ? prev.totalSpend : 0);
-            const ltvD = calcDelta(curr.ltv, prev ? prev.ltv : 0);
-            const paybackD = paybackDelta(curr.payback, prev ? prev.payback : 0);
+	            const mncsD = calcDelta(curr.totalMNCs, prev ? prev.totalMNCs : 0);
+	            const spendD = calcDelta(curr.totalSpend, prev ? prev.totalSpend : 0);
+	            const ltvD = calcDelta(curr.ltv, prev ? prev.ltv : 0);
+	            const paybackD = paybackDelta(curr.payback, prev ? prev.payback : 0);
 
-            const kpis = [
-                { label: 'Total MNCs', value: Math.round(curr.totalMNCs).toLocaleString(), delta: mncsD, icon: 'M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z' },
-                { label: 'Total Spend (USD)', value: `$${curr.totalSpend.toLocaleString(undefined, {minimumFractionDigits: 0, maximumFractionDigits: 0})}`, delta: spendD, icon: 'M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z' },
-                { label: 'W. Avg. LTV (USD)', value: `$${curr.ltv.toFixed(2)}`, delta: ltvD, icon: 'M13 7h8m0 0v8m0-8l-8 8-4-4-6 6' },
-                { label: 'W. Avg. Payback', value: `${curr.payback.toFixed(1)} mo`, delta: paybackD, icon: 'M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z' }
-            ];
+	            const kpis = [
+	                { label: 'Total MNCs', value: Math.round(curr.totalMNCs).toLocaleString(), delta: mncsD, forecast: getForecastCard('mncs'), icon: 'M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z' },
+		                { label: 'Total Spend (USD)', value: `$${curr.totalSpend.toLocaleString(undefined, {minimumFractionDigits: 0, maximumFractionDigits: 0})}`, delta: spendD, forecast: getForecastCard('spend'), icon: 'M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z' },
+	                { label: 'W. Avg. LTV (USD)', value: `$${curr.ltv.toFixed(2)}`, delta: ltvD, icon: 'M13 7h8m0 0v8m0-8l-8 8-4-4-6 6' },
+	                { label: 'W. Avg. Payback', value: `${curr.payback.toFixed(1)} mo`, delta: paybackD, icon: 'M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z' }
+	            ];
 
-            container.innerHTML = kpis.map(kpi => `
-                <div class="bg-white p-5 rounded-xl border border-slate-100 shadow-sm hover:shadow-md transition-shadow">
+	            container.innerHTML = kpis.map(kpi => `
+	                <div class="bg-white p-5 rounded-xl border border-slate-100 shadow-sm hover:shadow-md transition-shadow">
                     <div class="flex items-center justify-between mb-3">
                         <div class="bg-indigo-50 p-2.5 rounded-lg text-indigo-600">
                             <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="${kpi.icon}"></path></svg>
                         </div>
                         ${kpi.delta.val !== '-' ? `<span class="text-xs font-bold px-2 py-1 rounded-full ${kpi.delta.class}">${kpi.delta.icon} ${kpi.delta.val}</span>` : ''}
                     </div>
-                    <div>
-                        <p class="text-sm font-medium text-slate-500">${kpi.label}</p>
-                        <h4 class="text-2xl font-bold text-slate-900 mt-1">${kpi.value}</h4>
-                    </div>
-                </div>
-	            `).join('');
-	        }
+	                    <div>
+	                        <p class="text-sm font-medium text-slate-500">${kpi.label}</p>
+	                        <h4 class="text-2xl font-bold text-slate-900 mt-1">${kpi.value}</h4>
+                            ${kpi.forecast ? `
+                                <div class="mt-3 pt-3 border-t border-slate-100">
+                                    <p class="text-xs font-bold uppercase ${kpi.forecast.muted ? 'text-slate-400' : 'text-indigo-600'}">${kpi.forecast.label}</p>
+                                    ${kpi.forecast.value ? `<p class="text-base font-bold text-slate-900 mt-0.5">${kpi.forecast.value}</p>` : ''}
+                                    <p class="text-xs text-slate-400 mt-1 leading-snug">${kpi.forecast.note}</p>
+                                </div>
+                            ` : ''}
+	                    </div>
+	                </div>
+		            `).join('');
+		        }
 
 	        function formatHVCRatio(hvc, phvc) {
 	            if (!phvc || phvc <= 0) return '-';
@@ -3079,7 +3295,7 @@ CAN,tradedesk,2025-09,80,38.00,2400,200</textarea>
             // Benchmark Value - Default 15
             const benchmarkVal = document.getElementById('benchmarkInput').value || 15;
 
-            // Historical only, no forecast
+            // Historical chart only; month-end pacing forecast appears in the KPI cards.
             const allLabels = [...labels];
             
             // Label Style Definition - High Contrast & Readable
