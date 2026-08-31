@@ -1950,6 +1950,107 @@
             return date.toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
         }
 
+        function formatPacingDate(date, comparisonDate = null) {
+            const options = { month: 'short', day: 'numeric' };
+            if (comparisonDate && date.getFullYear() !== comparisonDate.getFullYear()) {
+                options.year = 'numeric';
+            }
+            return date.toLocaleDateString(undefined, options);
+        }
+
+        function getMonthKeyFromParts(monthParts) {
+            return `${monthParts.year}-${String(monthParts.monthIndex + 1).padStart(2, '0')}`;
+        }
+
+        function shiftMonthKey(month, offset) {
+            const monthParts = parseMonthKey(month);
+            if (!monthParts) return null;
+            const shifted = new Date(monthParts.year, monthParts.monthIndex + offset, 1);
+            return getMonthKeyFromParts({ year: shifted.getFullYear(), monthIndex: shifted.getMonth() });
+        }
+
+        function getLatestActiveDateForMonth(rows, monthKey) {
+            const monthParts = parseMonthKey(monthKey);
+            if (!monthParts) return null;
+
+            return rows.reduce((latest, row) => {
+                const hasActivity = (Number(row.MNCs) || 0) > 0 || (Number(row.Spend) || 0) > 0;
+                if (!hasActivity || row.Month !== monthKey) return latest;
+                if (!(row.DateObj instanceof Date) || isNaN(row.DateObj.getTime())) return latest;
+                if (row.DateObj.getFullYear() !== monthParts.year || row.DateObj.getMonth() !== monthParts.monthIndex) return latest;
+                if (!latest || row.DateObj > latest) return row.DateObj;
+                return latest;
+            }, null);
+        }
+
+        function aggregateRowsThroughMonthDay(rows, monthKey, cutoffDay) {
+            const monthParts = parseMonthKey(monthKey);
+            if (!monthParts || !cutoffDay) return null;
+
+            const daysInMonth = new Date(monthParts.year, monthParts.monthIndex + 1, 0).getDate();
+            const normalizedCutoffDay = Math.min(Math.max(Math.floor(cutoffDay), 1), daysInMonth);
+            const totals = {
+                monthKey,
+                cutoffDay: normalizedCutoffDay,
+                totalMNCs: 0,
+                totalSpend: 0,
+                rowCount: 0
+            };
+
+            rows.forEach(row => {
+                if (row.Month !== monthKey) return;
+                if (!(row.DateObj instanceof Date) || isNaN(row.DateObj.getTime())) return;
+                if (row.DateObj.getFullYear() !== monthParts.year || row.DateObj.getMonth() !== monthParts.monthIndex) return;
+                const day = row.DateObj.getDate();
+                if (day < 1 || day > normalizedCutoffDay) return;
+
+                totals.totalMNCs += Number(row.MNCs) || 0;
+                totals.totalSpend += Number(row.Spend) || 0;
+                totals.rowCount += 1;
+            });
+
+            totals.available = totals.rowCount > 0;
+            return totals;
+        }
+
+        function buildSameDayPacingComparison(rows, latestMonth) {
+            const latestParts = parseMonthKey(latestMonth);
+            const previousMonth = shiftMonthKey(latestMonth, -1);
+            const previousParts = parseMonthKey(previousMonth);
+            const latestDate = getLatestActiveDateForMonth(rows, latestMonth);
+            if (!latestParts || !previousParts || !latestDate) return null;
+
+            const latestDaysInMonth = new Date(latestParts.year, latestParts.monthIndex + 1, 0).getDate();
+            const previousDaysInMonth = new Date(previousParts.year, previousParts.monthIndex + 1, 0).getDate();
+            const comparisonDay = Math.min(latestDate.getDate(), latestDaysInMonth, previousDaysInMonth);
+            const current = aggregateRowsThroughMonthDay(rows, latestMonth, comparisonDay);
+            const previous = aggregateRowsThroughMonthDay(rows, previousMonth, comparisonDay);
+            if (!current?.available || !previous?.available) return null;
+
+            const calculateDelta = (currentValue, previousValue) => {
+                if (!previousValue || previousValue === 0) return null;
+                return ((currentValue - previousValue) / previousValue) * 100;
+            };
+
+            return {
+                latestMonth,
+                previousMonth,
+                cutoffDay: comparisonDay,
+                currentDate: new Date(latestParts.year, latestParts.monthIndex, comparisonDay),
+                previousDate: new Date(previousParts.year, previousParts.monthIndex, comparisonDay),
+                mncs: {
+                    current: current.totalMNCs,
+                    previous: previous.totalMNCs,
+                    delta: calculateDelta(current.totalMNCs, previous.totalMNCs)
+                },
+                spend: {
+                    current: current.totalSpend,
+                    previous: previous.totalSpend,
+                    delta: calculateDelta(current.totalSpend, previous.totalSpend)
+                }
+            };
+        }
+
         function buildLatestMonthForecast(rows, latestMonth, today = new Date()) {
             const monthParts = parseMonthKey(latestMonth);
             if (!monthParts) return null;
@@ -2142,8 +2243,9 @@
             currentMetrics = latestMetrics;
             const latestMonth = monthLabels[monthLabels.length - 1];
             const latestMonthForecast = latestMonth ? buildLatestMonthForecast(filteredData, latestMonth) : null;
+            const sameDayPacing = latestMonth ? buildSameDayPacingComparison(filteredData, latestMonth) : null;
             
-            updateSummaryMetrics(latestMetrics, prevMetrics, latestMonthForecast);
+            updateSummaryMetrics(latestMetrics, prevMetrics, latestMonthForecast, sameDayPacing);
             generateExecutiveSummary(latestMetrics, prevMetrics, filteredData, latestMonth);
             updateChart(monthLabels, chartData);
             updateConversionChart(monthLabels, chartData.conversion); // New Chart
@@ -2257,7 +2359,7 @@
             });
         }
 
-	        function updateSummaryMetrics(curr, prev, forecast = null) {
+	        function updateSummaryMetrics(curr, prev, forecast = null, sameDayPacing = null) {
 		            const container = document.getElementById('summaryMetrics');
 		            if (!curr) {
 		                container.innerHTML = `<div class="col-span-full text-center text-slate-500 py-4 bg-slate-50 rounded-lg">No data available for this selection.</div>`;
@@ -2324,14 +2426,32 @@
                     };
                 };
 
+                const getPacingCard = (metric) => {
+                    if (!sameDayPacing) return null;
+                    const pacing = sameDayPacing[metric];
+                    if (!pacing || pacing.delta === null || !isFinite(pacing.delta)) return null;
+
+                    const isUp = pacing.delta > 0;
+                    const isFlat = Math.abs(pacing.delta) < 0.05;
+                    const currentValue = metric === 'spend' ? formatCurrency(pacing.current) : formatNumber(pacing.current);
+                    const previousValue = metric === 'spend' ? formatCurrency(pacing.previous) : formatNumber(pacing.previous);
+
+                    return {
+                        label: 'Same-day pacing',
+                        value: isFlat ? 'Flat' : `${isUp ? '↑' : '↓'} ${Math.abs(pacing.delta).toFixed(1)}%`,
+                        class: isFlat ? 'text-slate-600 bg-slate-100' : isUp ? 'text-emerald-600 bg-emerald-50' : 'text-rose-600 bg-rose-50',
+                        note: `Through ${formatPacingDate(sameDayPacing.currentDate, sameDayPacing.previousDate)} vs ${formatPacingDate(sameDayPacing.previousDate, sameDayPacing.currentDate)}: ${currentValue} vs ${previousValue}.`
+                    };
+                };
+
 	            const mncsD = calcDelta(curr.totalMNCs, prev ? prev.totalMNCs : 0);
 	            const spendD = calcDelta(curr.totalSpend, prev ? prev.totalSpend : 0);
 	            const ltvD = calcDelta(curr.ltv, prev ? prev.ltv : 0);
 	            const paybackD = paybackDelta(curr.payback, prev ? prev.payback : 0);
 
 	            const kpis = [
-	                { label: 'Total MNCs', value: Math.round(curr.totalMNCs).toLocaleString(), delta: mncsD, forecast: getForecastCard('mncs'), icon: 'M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z' },
-		                { label: 'Total Spend (USD)', value: `$${curr.totalSpend.toLocaleString(undefined, {minimumFractionDigits: 0, maximumFractionDigits: 0})}`, delta: spendD, forecast: getForecastCard('spend'), icon: 'M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z' },
+	                { label: 'Total MNCs', value: Math.round(curr.totalMNCs).toLocaleString(), delta: mncsD, forecast: getForecastCard('mncs'), pacing: getPacingCard('mncs'), icon: 'M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z' },
+		                { label: 'Total Spend (USD)', value: `$${curr.totalSpend.toLocaleString(undefined, {minimumFractionDigits: 0, maximumFractionDigits: 0})}`, delta: spendD, forecast: getForecastCard('spend'), pacing: getPacingCard('spend'), icon: 'M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z' },
 	                { label: 'W. Avg. LTV (USD)', value: `$${curr.ltv.toFixed(2)}`, delta: ltvD, icon: 'M13 7h8m0 0v8m0-8l-8 8-4-4-6 6' },
 	                { label: 'W. Avg. Payback', value: `${curr.payback.toFixed(1)} mo`, delta: paybackD, icon: 'M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z' }
 	            ];
@@ -2352,6 +2472,15 @@
                                     <p class="text-xs font-bold uppercase ${kpi.forecast.muted ? 'text-slate-400' : 'text-indigo-600'}">${kpi.forecast.label}</p>
                                     ${kpi.forecast.value ? `<p class="text-base font-bold text-slate-900 mt-0.5">${kpi.forecast.value}</p>` : ''}
                                     <p class="text-xs text-slate-400 mt-1 leading-snug">${kpi.forecast.note}</p>
+                                </div>
+                            ` : ''}
+                            ${kpi.pacing ? `
+                                <div class="mt-3 pt-3 border-t border-slate-100">
+                                    <div class="flex items-center justify-between gap-2">
+                                        <p class="text-xs font-bold uppercase text-slate-500">${kpi.pacing.label}</p>
+                                        <span class="shrink-0 text-xs font-bold px-2 py-1 rounded-full ${kpi.pacing.class}">${kpi.pacing.value}</span>
+                                    </div>
+                                    <p class="text-xs text-slate-400 mt-1 leading-snug">${kpi.pacing.note}</p>
                                 </div>
                             ` : ''}
 	                    </div>
